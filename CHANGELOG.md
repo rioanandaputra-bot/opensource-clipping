@@ -1,0 +1,25 @@
+# Changelog
+
+All notable changes to the **OpenSource Clipping** project will be documented in this file.
+
+## [v0.3.0] - 2026-04-04
+
+### Added
+- **Modular CLI Architecture**: Completely refactored the project from a monolithic Jupyter Notebook into a clean, CLI-based Python project (`main.py` & `clipping/` package).
+- **Dynamic Scaling & Font Pairing (Kinetic Typography)**: Specific core words within the running subtitles now scale dynamically for emphasis (e.g., "I eat *RICE*").
+- **Contextual B-roll Injection**: The system now automatically fetches and splices contextual B-roll footage from Pexels based on relevant keywords spoken in the clip.
+- **Multi-language Documentation**: Added `README.md` (English) and `README_ID.md` (Indonesian), complete with execution guides for Google Colab.
+- **Environment Management**: Introduced `.env` support to securely manage API keys, removing hardcoded/Colab userdata from the core logic.
+
+### Changed
+- **Gemini Model**: Configured support for both `gemini-3-flash-preview` and `gemini-2.5-flash` via config parameters.
+- **Dependencies**: Streamlined dependency management, supporting both `uv` package manager and standard `requirements.txt` / `pyproject.toml`.
+
+---
+
+## [Planned / Upcoming Features]
+
+- **[Planned] Wefluence Integration**: Building an automated batch clipping system that pulls source videos directly from Google Drive and YouTube, crafting compelling video compilations.
+- **[Planned] Auto-Split Screen for Podcasts**: Introducing intelligent face-tracking and framing for podcast styled videos:
+  - **9:16 (Vertical)**: Automatically splits the screen (Top/Bottom) to show both speakers or goes full-screen 9:16 with automatic camera switching based on the active speaker's voice.
+  - **16:9 (Horizontal)**: Automatic Active Speaker detection that performs full frame cuts/switches based on who is currently talking (Speaker A / Speaker B / Wide Shot).
