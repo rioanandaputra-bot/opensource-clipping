@@ -29,7 +29,47 @@
 - **Google Gemini API Key** ([dapatkan di sini](https://aistudio.google.com/apikey))
 - **Pexels API Key** (opsional, untuk B-roll — [dapatkan di sini](https://www.pexels.com/api/))
 
-## 🚀 Cara Cepat
+## ☁️ Menjalankan di Google Colab (Direkomendasikan)
+
+Jika Anda tidak memiliki GPU di laptop/PC, cara termudah untuk menjalankan pipeline ini adalah melalui **Google Colab**.
+Buka notebook Google Colab baru, pastikan Runtime memakai **T4 GPU**, lalu jalankan cell berikut secara berurutan:
+
+**Cell 1: Setup & Clone**
+```python
+!rm -rf ./* ./.*
+!git clone https://github.com/your-username/opensource-clipping.git .
+!pip install -r requirements.txt
+```
+
+**Cell 2: Setup API Keys**
+```python
+import os
+from pathlib import Path
+from google.colab import userdata
+
+# Daftarkan GOOGLE_API_KEY di menu Secrets Colab (ikon kunci)
+GOOGLE_API_KEY = userdata.get("GOOGLE_API_KEY")
+
+env_text = f"GOOGLE_API_KEY={GOOGLE_API_KEY}\n"
+Path(".env").write_text(env_text, encoding="utf-8")
+```
+
+**Cell 3: Eksekusi**
+```python
+URL_YOUTUBE = "https://www.youtube.com/watch?v=Ip6pCjWp4lk"
+
+!python main.py \
+  --url "{URL_YOUTUBE}" \
+  --clips 5 \
+  --ratio "9:16" \
+  --font-style "HORMOZI"
+```
+
+*(Catatan: Kami juga telah menyertakan file `notebooks/Lib_OpenSource_Clipping.ipynb` di repositori ini sebagai template praktis).*
+
+---
+
+## 🚀 Cara Cepat (Lokal)
 
 ```bash
 # 1. Clone repo

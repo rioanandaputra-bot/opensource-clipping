@@ -29,7 +29,47 @@
 - **Google Gemini API Key** ([get one here](https://aistudio.google.com/apikey))
 - **Pexels API Key** (optional, for B-roll — [get one here](https://www.pexels.com/api/))
 
-## 🚀 Quick Start
+## ☁️ Running on Google Colab (Recommended)
+
+If you don't have a local GPU, the easiest way to run this pipeline is via **Google Colab**.
+Open a new Google Colab notebook, set the Runtime to **T4 GPU**, and create the following cells:
+
+**Cell 1: Setup & Clone**
+```python
+!rm -rf ./* ./.*
+!git clone https://github.com/your-username/opensource-clipping.git .
+!pip install -r requirements.txt
+```
+
+**Cell 2: Setup API Keys**
+```python
+import os
+from pathlib import Path
+from google.colab import userdata
+
+# Store your keys in Colab Secrets first!
+GOOGLE_API_KEY = userdata.get("GOOGLE_API_KEY")
+
+env_text = f"GOOGLE_API_KEY={GOOGLE_API_KEY}\n"
+Path(".env").write_text(env_text, encoding="utf-8")
+```
+
+**Cell 3: Execute**
+```python
+URL_YOUTUBE = "https://www.youtube.com/watch?v=Ip6pCjWp4lk"
+
+!python main.py \
+  --url "{URL_YOUTUBE}" \
+  --clips 5 \
+  --ratio "9:16" \
+  --font-style "HORMOZI"
+```
+
+*(Note: We have also included `notebooks/Lib_OpenSource_Clipping.ipynb` in the repo as a ready-to-use template).*
+
+---
+
+## 🚀 Local Quick Start
 
 ```bash
 # 1. Clone the repo
