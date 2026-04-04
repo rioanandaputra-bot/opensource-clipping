@@ -1061,8 +1061,8 @@ def proses_klip(rank, clip, rasio, glitch_ts, data_segmen, cfg, video_encoder):
     m_end = float(clip["end_time"])
     judul = clip.get("title_indonesia")
     judul_en = clip.get("title_inggris")
-    out_vid = f"highlight_rank_{rank}_ready.mp4"
-    out_thm = f"thumbnail_rank_{rank}.jpg"
+    out_vid = os.path.join(cfg.outputs_dir, f"highlight_rank_{rank}_ready.mp4")
+    out_thm = os.path.join(cfg.outputs_dir, f"thumbnail_rank_{rank}.jpg")
 
     manifest_item = {
         "rank": rank,

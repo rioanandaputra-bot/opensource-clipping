@@ -23,11 +23,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--token-file", default=".credentials/youtube_token.json",
                    help="Path to YouTube OAuth token (JSON format)")
-    p.add_argument("--manifest-file", default="render_manifest.json",
+    p.add_argument("--manifest-file", default="outputs/render_manifest.json",
                    help="Input manifest file from clipping pipeline")
-    p.add_argument("--result-file", default="youtube_upload_results.json",
+    p.add_argument("--result-file", default="outputs/youtube_upload_results.json",
                    help="Output JSON trace file for upload responses")
-    p.add_argument("--updated-manifest", default="render_manifest_uploaded.json",
+    p.add_argument("--updated-manifest", default="outputs/render_manifest_uploaded.json",
                    help="Output upgraded manifest file")
     p.add_argument("--tz-name", default="Asia/Makassar",
                    help="Timezone for scheduling (IANA format)")

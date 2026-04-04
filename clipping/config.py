@@ -206,12 +206,15 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
     args = parser.parse_args(argv)
 
     base_dir = os.getcwd()
+    outputs_dir = os.path.abspath(os.path.join(base_dir, "outputs"))
+    os.makedirs(outputs_dir, exist_ok=True)
     font_dir = os.path.abspath(os.path.join(base_dir, "custom_fonts"))
     os.makedirs(font_dir, exist_ok=True)
 
     cfg = SimpleNamespace(
         # Paths
         base_dir=base_dir,
+        outputs_dir=outputs_dir,
         font_dir=font_dir,
         file_video_asli=os.path.abspath(os.path.join(base_dir, "video_asli.mp4")),
         file_font_thumbnail=os.path.abspath(os.path.join(base_dir, NAMA_FONT_THUMBNAIL)),

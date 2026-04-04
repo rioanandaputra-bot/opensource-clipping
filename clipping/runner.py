@@ -5,6 +5,7 @@ Maps to Cell 4 (Execute) of the notebook.
 Orchestrates the full clip generation pipeline.
 """
 
+import os
 import json
 
 from . import engine, metadata, studio
@@ -50,7 +51,9 @@ def run_pipeline(cfg) -> list[dict]:
     # Step 4 — Metadata normalisation
     hasil_json = metadata.normalize_and_validate(hasil_json)
     metadata.print_preview(hasil_json)
-    metadata.save_metadata_preview(hasil_json)
+    
+    metadata_path = os.path.join(cfg.outputs_dir, "metadata_preview.json")
+    metadata.save_metadata_preview(hasil_json, path=metadata_path)
 
     # Step 5 — Video encoder & glitch
     video_encoder = studio.detect_video_encoder()
@@ -77,8 +80,9 @@ def run_pipeline(cfg) -> list[dict]:
             render_manifest.append(hasil_render)
 
     # Step 7 — Save manifest
-    with open("render_manifest.json", "w", encoding="utf-8") as f:
+    manifest_path = os.path.join(cfg.outputs_dir, "render_manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(render_manifest, f, ensure_ascii=False, indent=2)
 
-    print(f"\n💾 Render manifest disimpan ke render_manifest.json ({len(render_manifest)} item)")
+    print(f"\n💾 Render manifest disimpan ke {manifest_path} ({len(render_manifest)} item)")
     return render_manifest

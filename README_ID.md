@@ -153,14 +153,14 @@ graph LR
 
 ## 📤 Output
 
-Untuk setiap klip, pipeline menghasilkan:
+Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 
 | File | Deskripsi |
 |---|---|
-| `highlight_rank_N_ready.mp4` | Klip final dengan subtitle, B-roll, BGM |
-| `thumbnail_rank_N.jpg` | Thumbnail otomatis dengan teks judul |
-| `render_manifest.json` | Manifest berisi metadata semua klip |
-| `metadata_preview.json` | Metadata dari Gemini (judul, tag, caption) |
+| `outputs/highlight_rank_N_ready.mp4` | Klip final dengan subtitle, B-roll, BGM |
+| `outputs/thumbnail_rank_N.jpg` | Thumbnail otomatis dengan teks judul |
+| `outputs/render_manifest.json` | Manifest berisi metadata semua klip |
+| `outputs/metadata_preview.json` | Metadata dari Gemini (judul, tag, caption) |
 
 ## 🎵 Gaya Font
 
@@ -197,7 +197,7 @@ Untuk setiap klip, pipeline menghasilkan:
 Proyek ini sekarang menyertakan uploader YouTube mandiri (standalone) dengan dukungan penjadwalan (scheduling) otomatis!
 
 1. Tempatkan file `youtube_token.json` Anda yang telah dikonfigurasi ke dalam folder `.credentials/` (buat foldernya secara manual jika belum ada).
-2. Setelah proses render secara keseluruhan selesai (dan file `render_manifest.json` telah siap), jalankan script uploader:
+2. Setelah proses render secara keseluruhan selesai, script secara otomatis akan membaca metadata dan file video dari dalam folder `outputs/` (contoh: `outputs/render_manifest.json`). Anda cukup jalankan script uploader:
    ```bash
    # Mode biasa (default interval 8 jam & scheduling otomatis)
    python run_upload.py

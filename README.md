@@ -153,14 +153,14 @@ graph LR
 
 ## 📤 Output
 
-For each clip, the pipeline generates:
+For each clip, the pipeline creates an `outputs/` directory and generates:
 
 | File | Description |
 |---|---|
-| `highlight_rank_N_ready.mp4` | Final rendered clip with subtitles, B-roll, BGM |
-| `thumbnail_rank_N.jpg` | Auto-generated thumbnail with title text |
-| `render_manifest.json` | Manifest with metadata for all clips |
-| `metadata_preview.json` | Gemini-generated metadata (titles, tags, captions) |
+| `outputs/highlight_rank_N_ready.mp4` | Final rendered clip with subtitles, B-roll, BGM |
+| `outputs/thumbnail_rank_N.jpg` | Auto-generated thumbnail with title text |
+| `outputs/render_manifest.json` | Manifest with metadata for all clips |
+| `outputs/metadata_preview.json` | Gemini-generated metadata (titles, tags, captions) |
 
 ## 🎵 Font Styles
 
@@ -176,7 +176,7 @@ For each clip, the pipeline generates:
 The project now includes a standalone YouTube auto-uploader with scheduling support!
 
 1. Place your configured `youtube_token.json` file inside the `.credentials/` directory.
-2. After the rendering process finishes (and `render_manifest.json` is generated), simply run the uploader:
+2. After the rendering process finishes, the script will automatically read from the generated `outputs/` directory (e.g., `outputs/render_manifest.json` and the final videos). Simply run the uploader:
    ```bash
    # Basic run (uses default 8-hour interval and auto timezone)
    python run_upload.py
