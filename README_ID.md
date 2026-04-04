@@ -192,9 +192,20 @@ Untuk setiap klip, pipeline menghasilkan:
 **🌐 Asset Eksternal**
 - Semua asset pendukung (Model AI, Glitch video, Font) akan diunduh **otomatis** saat pertama kali dijalankan
 
-## 📺 Upload YouTube (Khusus Notebook)
+## 📺 Upload Otomatis ke YouTube
 
-Cell 5 dari notebook asli (`OpenSource_Clipping.ipynb`) berisi uploader YouTube dengan fitur scheduling. Fitur ini **tidak** termasuk dalam proyek CLI — jalankan terpisah dari notebook setelah proses render selesai.
+Proyek ini sekarang menyertakan uploader YouTube mandiri (standalone) dengan dukungan penjadwalan (scheduling) otomatis!
+
+1. Tempatkan file `youtube_token.json` Anda yang telah dikonfigurasi ke dalam folder `.credentials/` (buat foldernya secara manual jika belum ada).
+2. Setelah proses render secara keseluruhan selesai (dan file `render_manifest.json` telah siap), jalankan script uploader:
+   ```bash
+   # Mode biasa (default interval 8 jam & scheduling otomatis)
+   python run_upload.py
+
+   # Atau jalankan dengan argumen kustom (contoh):
+   python run_upload.py --interval-hours 12 --tz-name "Asia/Jakarta"
+   ```
+3. Untuk mengetes hanya dengan video pertama, jalankan dengan argumen `--test-mode`. Gunakan perintah `python run_upload.py --help` untuk melihat opsi timezone dan interval penjadwalan.
 
 ## 📄 Lisensi
 

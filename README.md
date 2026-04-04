@@ -171,9 +171,20 @@ For each clip, the pipeline generates:
 | `CINEMATIC` | Roboto | Bebas Neue | Film / dramatic |
 | `DEFAULT` | Montserrat Black | Montserrat Medium | General purpose |
 
-## 📺 YouTube Upload (Notebook Only)
+## 📺 Auto-Upload to YouTube
 
-Cell 5 of the original notebook (`OpenSource_Clipping.ipynb`) contains a YouTube uploader with scheduling support. This is **not** included in the CLI project — run it separately from the notebook after rendering is complete.
+The project now includes a standalone YouTube auto-uploader with scheduling support!
+
+1. Place your configured `youtube_token.json` file inside the `.credentials/` directory.
+2. After the rendering process finishes (and `render_manifest.json` is generated), simply run the uploader:
+   ```bash
+   # Basic run (uses default 8-hour interval and auto timezone)
+   python run_upload.py
+
+   # Or run with custom arguments (example):
+   python run_upload.py --interval-hours 12 --tz-name "Asia/Jakarta"
+   ```
+3. To run a test with only the first video, use `python run_upload.py --test-mode`. Run `python run_upload.py --help` to see all scheduling and timezone options.
 
 ## 📄 License
 
