@@ -34,16 +34,29 @@ def run_pipeline(cfg) -> list[dict]:
     """
 
     # Step 1 — Download
-    engine.download_video(cfg.url_youtube, cfg.file_video_asli)
+    engine.download_video(cfg.url_youtube, cfg.file_video_asli, getattr(cfg, "use_dlp_subs", False))
 
     # Step 2 — Transcribe
-    transkrip_lengkap, data_segmen = engine.transcribe_video(
-        cfg.file_video_asli,
-        max_words_per_subtitle=cfg.max_kata_per_subtitle,
-        model_size=cfg.whisper_model,
-        device=cfg.whisper_device,
-        compute_type=cfg.whisper_compute_type,
-    )
+    transkrip_lengkap = ""
+    data_segmen = []
+    
+    file_json3 = cfg.file_video_asli.replace(".mp4", ".en.json3")
+    if getattr(cfg, "use_dlp_subs", False) and os.path.exists(file_json3):
+        transkrip_lengkap, data_segmen = engine.parse_youtube_json3_subs(
+            file_json3,
+            max_words_per_subtitle=cfg.max_kata_per_subtitle
+        )
+        if transkrip_lengkap and data_segmen:
+            print("✅ Berhasil menggunakan subtitle dari YouTube (DLP), melewati proses Whisper.")
+
+    if not transkrip_lengkap or not data_segmen:
+        transkrip_lengkap, data_segmen = engine.transcribe_video(
+            cfg.file_video_asli,
+            max_words_per_subtitle=cfg.max_kata_per_subtitle,
+            model_size=cfg.whisper_model,
+            device=cfg.whisper_device,
+            compute_type=cfg.whisper_compute_type,
+        )
 
     # Step 3 — Gemini AI analysis
     hasil_json = engine.analyze_with_gemini(transkrip_lengkap, cfg)

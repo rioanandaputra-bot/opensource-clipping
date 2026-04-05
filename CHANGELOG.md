@@ -7,6 +7,13 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.5.0] - 2026-04-05
+
+### Added
+- **YouTube DLP Subtitles**: Added the `--use-dlp-subs` flag to prioritize parsing YouTube's built-in manual and auto-generated `json3` subtitles, completely bypassing `faster-whisper` and drastically speeding up the audio-transcription phase of the clipping pipeline.
+
+---
+
 ## [v0.4.2] - 2026-04-05
 
 ### Added

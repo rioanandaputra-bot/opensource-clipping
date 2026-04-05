@@ -16,7 +16,7 @@ from faster_whisper import WhisperModel
 # TAHAP 1: DOWNLOAD VIDEO
 # ==============================================================================
 
-def download_video(url: str, output_path: str) -> None:
+def download_video(url: str, output_path: str, use_dlp_subs: bool = False) -> None:
     """Download a YouTube video to *output_path* (max 1080p)."""
     print("[1/3] Mendownload video dari YouTube...")
 
@@ -33,13 +33,98 @@ def download_video(url: str, output_path: str) -> None:
         "remote_components": ["ejs:github"],
     }
 
+    if use_dlp_subs:
+        print("      Menambahkan opsi download subtitle (English, JSON3)")
+        ydl_opts.update({
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+            "subtitleslangs": ["en"],
+            "subtitlesformat": "json3"
+        })
+
     with YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
 
 # ==============================================================================
-# TAHAP 2: TRANSKRIPSI WHISPER
+# TAHAP 2: TRANSKRIPSI WHISPER & JSON3 FALLBACK
 # ==============================================================================
+
+def parse_youtube_json3_subs(json_path: str, max_words_per_subtitle: int = 5) -> tuple[str, list[dict]]:
+    """
+    Parse downloaded YouTube JSON3 subtitles into transkrip_lengkap and data_segmen.
+    Returns empty string/list if parsing fails.
+    """
+    import json
+    
+    print("[2/3] Memproses subtitle JSON3 dari YouTube...")
+    transkrip_lengkap = ""
+    data_segmen = []
+    
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            subs_data = json.load(f)
+            
+        events = subs_data.get("events", [])
+        
+        flat_words = []
+        for event in events:
+            # YouTube timestamps are in ms
+            t_start = event.get("tStartMs", 0) / 1000.0
+            
+            segs = event.get("segs", [])
+            for seg in segs:
+                text = seg.get("utf8", "")
+                if not text.strip() or text == "\n":
+                    continue
+                
+                # tOffsetMs is offset from t_start
+                offset = seg.get("tOffsetMs", 0) / 1000.0
+                word_start = t_start + offset
+                # Approximate word end by giving it arbitrary small duration or just slightly after start
+                # or base it on next word/event duration.
+                
+                # Clean up word text
+                clean_text = text.replace('\\n', ' ').strip()
+                if clean_text:
+                    flat_words.append({
+                        "word": clean_text,
+                        "start": word_start,
+                        "end": word_start + 0.3  # Fallback duration if next doesn't exist
+                    })
+                    
+        # Adjust end times based on the start time of the next word to prevent overlaps
+        for i in range(len(flat_words) - 1):
+            if flat_words[i]["end"] > flat_words[i+1]["start"]:
+                flat_words[i]["end"] = max(flat_words[i]["start"] + 0.1, flat_words[i+1]["start"])
+                
+        # Group them into segments
+        chunk_words = []
+        chunk_start = 0.0
+        
+        for i, w in enumerate(flat_words):
+            if len(chunk_words) == 0:
+                chunk_start = w["start"]
+                
+            chunk_words.append(w)
+            
+            if len(chunk_words) == max_words_per_subtitle or i == len(flat_words) - 1:
+                chunk_text = " ".join([cw["word"] for cw in chunk_words])
+                chunk_end = w["end"]
+                transkrip_lengkap += f"[{chunk_start:.1f} - {chunk_end:.1f}] {chunk_text}\n"
+                
+                data_segmen.append({
+                    "start": chunk_start,
+                    "end": chunk_end,
+                    "words": chunk_words
+                })
+                chunk_words = []
+                
+        return transkrip_lengkap, data_segmen
+        
+    except Exception as e:
+        print(f"⚠️ Gagal memparsing JSON3: {e}")
+        return "", []
 
 def transcribe_video(
     video_path: str,
