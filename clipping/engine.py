@@ -85,7 +85,12 @@ def parse_youtube_json3_subs(json_path: str, max_words_per_subtitle: int = 5) ->
                 # or base it on next word/event duration.
                 
                 # Clean up word text
-                clean_text = text.replace('\\n', ' ').strip()
+                clean_text = text.replace('\n', ' ').replace('\u200b', '').strip()
+                # Remove common problematic unicode characters like music notes and ZWJ
+                # and essentially keep only basic latin and common punctuation just in case
+                import re
+                clean_text = re.sub(r'[^\x00-\x7F\u00C0-\u017F\u2018-\u201F\u2026]', '', clean_text)
+                
                 if clean_text:
                     flat_words.append({
                         "word": clean_text,

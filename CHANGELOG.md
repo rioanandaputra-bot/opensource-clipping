@@ -7,6 +7,13 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.5.1] - 2026-04-05
+
+### Fixed
+- **JSON3 Text Sanitizer**: Implemented a regex sanitizer for YouTube auto-generated captions (`parse_youtube_json3_subs`) to automatically strip unprintable glyphs, emojis, music notes, and zero-width identifiers (e.g. `\u200b`). This prevents `FFmpeg` from crashing during the subtitle burn-in phase due to unsupported font fallbacks (`failed to find any fallback with glyph`).
+
+---
+
 ## [v0.5.0] - 2026-04-05
 
 ### Added
