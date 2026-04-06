@@ -7,6 +7,13 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.6.1] - 2026-04-06
+
+### Fixed
+- **Pyannote API Compatibility**: Fixed `Pipeline.from_pretrained() got an unexpected keyword argument 'use_auth_token'` error by updating to the newer `token` parameter, with automatic fallback to `use_auth_token` for older versions.
+
+---
+
 ## [v0.6.0] - 2026-04-06
 
 > ⚠️ **Experimental**: The split-screen feature in this version is experimental and may be rolled back or undergo significant changes in future updates. Use with discretion.
