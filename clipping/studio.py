@@ -1944,6 +1944,9 @@ def proses_klip(
     m_end = float(clip["end_time"])
     judul = clip.get("title_indonesia")
     judul_en = clip.get("title_inggris")
+    tiktok_title_id = clip.get("tiktok_title_id", "")
+    tiktok_caption_id = clip.get("tiktok_caption_id", "")
+
     out_vid = os.path.join(cfg.outputs_dir, f"highlight_rank_{rank}_ready.mp4")
     out_thm = os.path.join(cfg.outputs_dir, f"thumbnail_rank_{rank}.jpg")
 
@@ -1962,8 +1965,16 @@ def proses_klip(
         "tiktok_caption_final": clip.get(
             "tiktok_caption_final", clip.get("hastag", "")
         ),
+        "tiktok_title_id_final": clip.get(
+            "tiktok_title_id_final", clip.get("tiktok_title_id", "")
+        ),
+        "tiktok_caption_id_final": clip.get(
+            "tiktok_caption_id_final", clip.get("tiktok_caption_id", clip.get("hastag", ""))
+        ),
         "title_indonesia": clip.get("title_indonesia", ""),
         "title_inggris": clip.get("title_inggris", ""),
+        "tiktok_title_id": clip.get("tiktok_title_id", ""),
+        "tiktok_caption_id": clip.get("tiktok_caption_id", ""),
         "hastag": clip.get("hastag", ""),
         "start_time": m_start,
         "end_time": m_end,
@@ -1977,10 +1988,12 @@ def proses_klip(
 
     print(f"\n{'=' * 70}")
     print(f"🔥 [Rank {rank}] Memproses clip")
-    print(f"📝 [Judul Indo]   : '{clip.get('title_indonesia', '-')}'")
-    print(f"📝 [Judul Inggris]: '{clip.get('title_inggris', '-')}'")
-    print(f"#️⃣ [Hastag]      : '{clip.get('hastag', '-')}'")
-    print(f"🧠 Encoder aktif  : {video_encoder['name']}")
+    print(f"📝 [Judul Indo]         : '{clip.get('title_indonesia', '-')}'")
+    print(f"📝 [Judul Inggris]      : '{clip.get('title_inggris', '-')}'")
+    print(f"📝 [TikTok Title ID]    : '{clip.get('tiktok_title_id', '-')}'")
+    print(f"📝 [TikTok Caption ID]  : '{clip.get('tiktok_caption_id', '-')}'")
+    print(f"#️⃣ [Hastag]            : '{clip.get('hastag', '-')}'")
+    print(f"🧠 Encoder aktif        : {video_encoder['name']}")
     print(f"{'=' * 70}")
 
     typography_plan = clip.get("typography_plan", [])

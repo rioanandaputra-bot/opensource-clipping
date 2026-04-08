@@ -36,6 +36,7 @@ def download_video(url: str, output_path: str, use_dlp_subs: bool = False) -> No
     if use_dlp_subs:
         print("      Mencoba mencari subtitle bahasa otomatis (en / id)...")
         import glob
+
         for lang in ["en", "id"]:
             ydl_opts_subs = ydl_opts.copy()
             ydl_opts_subs.update({
@@ -43,13 +44,13 @@ def download_video(url: str, output_path: str, use_dlp_subs: bool = False) -> No
                 "writeautomaticsub": True,
                 "subtitleslangs": [lang],
                 "subtitlesformat": "json3",
-                "skip_download": True, # Hanya fokus download subtitle
+                "skip_download": True,  # Hanya fokus download subtitle
             })
-            
+
             try:
                 with YoutubeDL(ydl_opts_subs) as ydl:
                     ydl.download([url])
-                
+
                 # Cek apakah json3 untuk bahasa ini benar-benar terdownload
                 if glob.glob(output_path.replace(".mp4", f".*.json3")):
                     print(f"      ✅ Subtitle '{lang}' ditemukan. Melanjutkan ke video...")
@@ -72,99 +73,99 @@ def parse_youtube_json3_subs(json_path: str, max_words_per_subtitle: int = 5) ->
     Returns empty string/list if parsing fails.
     """
     import json
-    
+
     print("[2/3] Memproses subtitle JSON3 dari YouTube...")
     transkrip_lengkap = ""
     data_segmen = []
-    
+
     try:
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             subs_data = json.load(f)
-            
+
         events = subs_data.get("events", [])
-        
+
         flat_words = []
         for event in events:
             # YouTube timestamps are in ms
             t_start = event.get("tStartMs", 0) / 1000.0
             d_duration = event.get("dDurationMs", 0) / 1000.0
             event_end = t_start + d_duration
-            
+
             segs = event.get("segs", [])
             for i, seg in enumerate(segs):
                 text = seg.get("utf8", "")
                 if not text.strip() or text == "\n":
                     continue
-                
+
                 # tOffsetMs is offset from t_start
                 offset = seg.get("tOffsetMs", 0) / 1000.0
                 seg_start = t_start + offset
-                
+
                 # Determine end of this segment
                 if i < len(segs) - 1:
-                    next_offset = segs[i+1].get("tOffsetMs", 0) / 1000.0
+                    next_offset = segs[i + 1].get("tOffsetMs", 0) / 1000.0
                     seg_end = t_start + next_offset
                 else:
                     seg_end = event_end
-                    
+
                 if seg_end <= seg_start:
                     seg_end = seg_start + 1.0  # Fallback duration
-                
+
                 # Clean up word text
-                clean_text = text.replace('\n', ' ').replace('\u200b', '').strip()
-                import re
-                clean_text = re.sub(r'[^\x00-\x7F\u00C0-\u017F\u2018-\u201F\u2026]', '', clean_text)
-                
+                clean_text = text.replace("\n", " ").replace("\u200b", "").strip()
+                clean_text = re.sub(r"[^\x00-\x7F\u00C0-\u017F\u2018-\u201F\u2026]", "", clean_text)
+
                 if clean_text:
-                    # Memecah teks menjadi kata tunggal (fitur wajib agar karaoke per-kata bekerja persis seperti whisper)
+                    # Memecah teks menjadi kata tunggal agar karaoke per-kata bekerja seperti whisper
                     words_in_seg = clean_text.split()
                     if not words_in_seg:
                         continue
-                        
+
                     duration_per_word = (seg_end - seg_start) / len(words_in_seg)
-                    
+
                     for w_idx, w_text in enumerate(words_in_seg):
                         w_start = seg_start + (w_idx * duration_per_word)
                         w_end = w_start + duration_per_word
-                        
+
                         flat_words.append({
                             "word": w_text,
                             "start": w_start,
-                            "end": w_end
+                            "end": w_end,
                         })
-                    
+
         # Adjust end times based on the start time of the next word to prevent overlaps
         for i in range(len(flat_words) - 1):
-            if flat_words[i]["end"] > flat_words[i+1]["start"]:
-                flat_words[i]["end"] = max(flat_words[i]["start"] + 0.1, flat_words[i+1]["start"])
-                
+            if flat_words[i]["end"] > flat_words[i + 1]["start"]:
+                flat_words[i]["end"] = max(flat_words[i]["start"] + 0.1, flat_words[i + 1]["start"])
+
         # Group them into segments
         chunk_words = []
         chunk_start = 0.0
-        
+
         for i, w in enumerate(flat_words):
             if len(chunk_words) == 0:
                 chunk_start = w["start"]
-                
+
             chunk_words.append(w)
-            
+
             if len(chunk_words) == max_words_per_subtitle or i == len(flat_words) - 1:
                 chunk_text = " ".join([cw["word"] for cw in chunk_words])
                 chunk_end = w["end"]
                 transkrip_lengkap += f"[{chunk_start:.1f} - {chunk_end:.1f}] {chunk_text}\n"
-                
+
                 data_segmen.append({
                     "start": chunk_start,
                     "end": chunk_end,
-                    "words": chunk_words
+                    "words": chunk_words,
                 })
                 chunk_words = []
-                
+
         return transkrip_lengkap, data_segmen
-        
+
     except Exception as e:
         print(f"⚠️ Gagal memparsing JSON3: {e}")
         return "", []
+
 
 def transcribe_video(
     video_path: str,
@@ -224,10 +225,10 @@ def transcribe_video(
 # ==============================================================================
 
 # ---- Retry Config ----
-MAX_ATTEMPTS           = 10
-INITIAL_WAIT_SECONDS   = 60
+MAX_ATTEMPTS = 10
+INITIAL_WAIT_SECONDS = 60
 WAIT_INCREMENT_SECONDS = 30
-REQUEST_TIMEOUT_MS     = 15 * 60 * 1000  # 15 menit
+REQUEST_TIMEOUT_MS = 15 * 60 * 1000  # 15 menit
 RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
 
 
@@ -318,7 +319,9 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
                 f"Laporan Fallback error={exc_fallback}"
             ) from exc_fallback
 
-    raise RuntimeError(f"Gagal memanggil Gemini setelah {MAX_ATTEMPTS} percobaan. Error terakhir: {last_exc}") from last_exc
+    raise RuntimeError(
+        f"Gagal memanggil Gemini setelah {MAX_ATTEMPTS} percobaan. Error terakhir: {last_exc}"
+    ) from last_exc
 
 
 def analyze_with_gemini(
@@ -413,7 +416,8 @@ ALASAN PEMILIHAN:
 
 ATURAN BAHASA METADATA:
 - title_indonesia tetap wajib diisi untuk kompatibilitas internal / fallback.
-- Semua metadata yang dipakai untuk platform harus berbahasa Inggris natural.
+- title_indonesia HARUS dalam Bahasa Indonesia natural dan maksimal 100 karakter.
+- Semua metadata lintas platform utama harus berbahasa Inggris natural.
 - Ini berlaku untuk:
   - title_inggris
   - hastag
@@ -421,7 +425,13 @@ ATURAN BAHASA METADATA:
   - description_context
   - keyword_tags
   - tiktok_caption
-- Jangan mencampur Bahasa Indonesia dan Bahasa Inggris di metadata platform.
+- Khusus kebutuhan TikTok versi Indonesia, juga buat:
+  - tiktok_title_id
+  - tiktok_caption_id
+- tiktok_title_id dan tiktok_caption_id HARUS dalam Bahasa Indonesia natural.
+- tiktok_title_id harus lebih deskriptif daripada title_indonesia, boleh lebih panjang dari 100 karakter jika perlu, dan harus menjelaskan isi klip/video dengan jelas.
+- tiktok_caption_id harus natural, informatif, cocok untuk audiens Indonesia, dan boleh sedikit lebih panjang jika itu membantu menjelaskan isi klip.
+- Jangan mencampur Bahasa Indonesia dan Bahasa Inggris di dalam field yang sama.
 - Gunakan English yang natural, ringkas, enak dibaca, dan cocok untuk short-form content.
 - Hindari terjemahan literal yang kaku.
 
@@ -475,7 +485,23 @@ Untuk setiap klip, hasilkan metadata berikut:
 - Utamakan keyword yang mungkin benar-benar dicari orang.
 - Field ini terutama untuk kebutuhan metadata YouTube.
 
-7. tiktok_caption
+7. tiktok_title_id
+- Bahasa Indonesia natural.
+- Lebih panjang dan lebih menjelaskan isi video daripada title_indonesia.
+- Tidak perlu dibatasi 100 karakter, tapi tetap harus ringkas, jelas, dan enak dibaca.
+- Harus relevan dengan isi klip, bukan isi video panjang secara umum.
+- Jangan clickbait murahan.
+
+8. tiktok_caption_id
+- 1 sampai 2 kalimat.
+- HARUS dalam Bahasa Indonesia.
+- Boleh sedikit lebih panjang daripada caption English jika membantu menjelaskan isi klip.
+- Gaya natural, ringan, dan enak dibaca.
+- Tetap sesuai isi klip.
+- Jangan sekadar copy-paste title.
+- Jangan terlalu formal.
+
+9. tiktok_caption
 - 1 sampai 2 kalimat singkat.
 - HARUS dalam Bahasa Inggris.
 - Gaya lebih natural, ringan, dan conversational.
@@ -491,6 +517,7 @@ ATURAN KUALITAS METADATA:
 - Jika ada angka, frasa kuat, atau statement tajam dari ucapan asli, prioritaskan itu sebagai inspirasi judul/caption.
 - Title, descriptions, dan caption harus saling melengkapi, bukan mengulang kalimat yang sama.
 - Semua field metadata yang dipakai untuk platform harus berbahasa Inggris natural, bukan terjemahan literal yang kaku.
+- Khusus tiktok_title_id dan tiktok_caption_id, gunakan Bahasa Indonesia yang natural, jelas, dan lebih menjelaskan isi klip untuk audiens Indonesia.
 
 ATURAN OUTPUT:
 - Output HARUS berupa JSON array valid.
@@ -563,6 +590,8 @@ Transkrip:
                         "type": "ARRAY",
                         "items": {"type": "STRING"},
                     },
+                    "tiktok_title_id": {"type": "STRING"},
+                    "tiktok_caption_id": {"type": "STRING"},
                     "tiktok_caption": {"type": "STRING"},
                 },
                 "required": [
@@ -571,7 +600,8 @@ Transkrip:
                     "broll_list", "alasan", "bgm_mood",
                     "title_indonesia", "title_inggris", "hastag",
                     "description_hook", "description_context",
-                    "keyword_tags", "tiktok_caption",
+                    "keyword_tags", "tiktok_title_id",
+                    "tiktok_caption_id", "tiktok_caption",
                 ],
             },
         },

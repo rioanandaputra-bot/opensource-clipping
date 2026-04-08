@@ -85,6 +85,8 @@ def _looks_indonesian(text):
     indikator = [
         " yang ", " dan ", " untuk ", " dengan ", " karena ", " adalah ",
         " bisa ", " tidak ", " lebih ", " dalam ", " pada ", " agar ",
+        " dari ", " ini ", " itu ", " juga ", " kalau ", " saat ",
+        " tentang ", " bikin ", " banget ", " jadi ", " sudah ",
     ]
     return any(w in text for w in indikator)
 
@@ -109,6 +111,8 @@ def normalize_and_validate(hasil_json: list[dict]) -> list[dict]:
         item["title_inggris"] = _trim_title(item.get("title_inggris", ""))
         item["description_hook"] = _normalize_spaces(item.get("description_hook", ""))
         item["description_context"] = _normalize_spaces(item.get("description_context", ""))
+        item["tiktok_title_id"] = _normalize_spaces(item.get("tiktok_title_id", ""))
+        item["tiktok_caption_id"] = _normalize_spaces(item.get("tiktok_caption_id", ""))
         item["tiktok_caption"] = _normalize_spaces(item.get("tiktok_caption", ""))
         item["keyword_tags"] = _normalize_keyword_tags(item.get("keyword_tags", []))
 
@@ -123,8 +127,17 @@ def normalize_and_validate(hasil_json: list[dict]) -> list[dict]:
             item.get("hastag", ""),
         )
         item["youtube_tags_final"] = item.get("keyword_tags", [])
+
+        # TikTok EN (existing behavior)
         item["tiktok_caption_final"] = _build_tiktok_caption(
             item.get("tiktok_caption", ""),
+            item.get("hastag", ""),
+        )
+
+        # TikTok ID (new fields)
+        item["tiktok_title_id_final"] = item.get("tiktok_title_id", "") or item.get("title_indonesia", "")
+        item["tiktok_caption_id_final"] = _build_tiktok_caption(
+            item.get("tiktok_caption_id", ""),
             item.get("hastag", ""),
         )
 
@@ -149,6 +162,11 @@ def normalize_and_validate(hasil_json: list[dict]) -> list[dict]:
             warning.append("description_context kosong")
         if len(item["keyword_tags"]) < 5:
             warning.append("keyword_tags terlalu sedikit")
+
+        if not item["tiktok_title_id"]:
+            warning.append("tiktok_title_id kosong")
+        if not item["tiktok_caption_id"]:
+            warning.append("tiktok_caption_id kosong")
         if not item["tiktok_caption"]:
             warning.append("tiktok_caption kosong")
 
@@ -161,11 +179,17 @@ def normalize_and_validate(hasil_json: list[dict]) -> list[dict]:
         if _looks_indonesian(item["tiktok_caption"]):
             warning.append("tiktok_caption terdeteksi bukan English penuh")
 
+        if item["tiktok_title_id"] and not _looks_indonesian(item["tiktok_title_id"]):
+            warning.append("tiktok_title_id terdeteksi bukan Bahasa Indonesia")
+        if item["tiktok_caption_id"] and not _looks_indonesian(item["tiktok_caption_id"]):
+            warning.append("tiktok_caption_id terdeteksi bukan Bahasa Indonesia")
+
         laporan.append({
             "rank": rank,
             "durasi": round(float(item.get("end_time", 0)) - float(item.get("start_time", 0)), 2),
             "title_indonesia": item["title_indonesia"],
             "title_inggris": item["title_inggris"],
+            "tiktok_title_id": item["tiktok_title_id"],
             "hashtags": item["hastag"],
             "warnings": " | ".join(warning) if warning else "OK",
         })
@@ -187,19 +211,23 @@ def print_preview(hasil_json: list[dict]) -> None:
     print("- youtube_description_final")
     print("- youtube_tags_final")
     print("- tiktok_caption_final")
+    print("- tiktok_title_id_final")
+    print("- tiktok_caption_id_final")
     print()
 
     print("===== PREVIEW DETAIL PER KLIP =====")
     for item in hasil_json:
         print(f"\n--- Rank {item['rank']} ---")
-        print(f"Title ID  : {item['title_indonesia']}")
-        print(f"Title EN  : {item['title_inggris']}")
-        print(f"Hashtag   : {item['hastag']}")
-        print(f"Hook Desc : {item['description_hook']}")
-        print(f"Ctx Desc  : {item['description_context']}")
-        print(f"YT Desc   : {item['youtube_description_final']}")
-        print(f"YT Tags   : {item['youtube_tags_final']}")
-        print(f"TikTok    : {item['tiktok_caption_final']}")
+        print(f"Title ID          : {item['title_indonesia']}")
+        print(f"Title EN          : {item['title_inggris']}")
+        print(f"TikTok Title ID   : {item.get('tiktok_title_id_final', '')}")
+        print(f"Hashtag           : {item['hastag']}")
+        print(f"Hook Desc         : {item['description_hook']}")
+        print(f"Ctx Desc          : {item['description_context']}")
+        print(f"YT Desc           : {item['youtube_description_final']}")
+        print(f"YT Tags           : {item['youtube_tags_final']}")
+        print(f"TikTok EN         : {item['tiktok_caption_final']}")
+        print(f"TikTok Caption ID : {item.get('tiktok_caption_id_final', '')}")
 
 
 def save_metadata_preview(hasil_json: list[dict], path: str = "metadata_preview.json") -> None:

@@ -7,6 +7,15 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.7.1] - 2026-04-08
+
+### Added
+- **TikTok Indonesian Metadata Support**: Added new fields `tiktok_title_id` and `tiktok_caption_id` specifically for Indonesian-localized TikTok content.
+- **Enhanced Validations**: Added warnings if English fields contain Indonesian text or if Indonesian fields contain non-Indonesian text to ensure strict locale compliance.
+- **Enriched Preview**: Updated `print_preview()` to display the new TikTok ID fields in the CLI output.
+
+---
+
 ## [v0.7.0] - 2026-04-06
 
 > ⚠️ **Experimental**: The camera-switch feature in this version is experimental and may be rolled back or undergo significant changes in future updates.
