@@ -21,8 +21,8 @@
 | **Auto-Thumbnail** | Frame extraction with dark overlay and large title text |
 | **Cross-Platform Metadata** | YouTube title/description/tags + TikTok caption — all in English |
 | **Auto YouTube Uploader** | Automatically upload highlight clips to YouTube with scheduling support and full metadata (optional) |
-| **Podcast Split-Screen** | Auto speaker diarization via **Pyannote** with top-bottom split-screen layout for 2-speaker podcasts (9:16) |
-| **Podcast Camera Switch** | Auto active-speaker detection that switches a full 9:16 crop to focus on whoever is talking; blurred pillarbox when both speak simultaneously (9:16) |
+| **Podcast Split-Screen** | Auto speaker diarization via **Pyannote** with top-bottom split-screen layout for podcasts (9:16). Supports **3+ speakers across multiple scenes** with per-speaker frozen frame fallback |
+| **Podcast Camera Switch** | Auto active-speaker detection with scene-aware switching — full 9:16 crop focuses on whoever is talking; blurred pillarbox only when speakers in the same scene talk simultaneously (9:16) |
 
 ## 📋 Prerequisites
 
@@ -125,6 +125,13 @@ python main.py --url "https://youtube.com/watch?v=PODCAST_ID" \
   --ratio "9:16" \
   --camera-switch \
   --switch-hold-duration 2.0
+
+# Multi-Speaker Podcast (3 speakers across 2 scenes)
+python main.py --url "https://youtube.com/watch?v=PODCAST_ID" \
+  --clips 3 \
+  --ratio "9:16" \
+  --camera-switch \
+  --diarization-speakers 3
 ```
 
 ## ⚙️ CLI Options
@@ -154,36 +161,39 @@ python main.py --help
 | `--whisper-compute-type` | `float16` | Compute type for Whisper (`float16`, `int8`, etc.) |
 | `--gemini-model` | `gemini-3-flash-preview` | Gemini model name |
 | `--gemini-fallback-model` | `gemini-2.5-flash` | Gemini fallback model name if main model fails |
-| `--split-screen` | `False` | Enable split-screen mode for 2-speaker podcasts (9:16 only, requires `HF_TOKEN`) |
-| `--diarization-speakers` | `2` | Number of speakers for diarization (used with `--split-screen`) |
+| `--split-screen` | `False` | Enable split-screen mode for podcasts (9:16 only, requires `HF_TOKEN`). Supports 3+ speakers across multiple scenes |
+| `--diarization-speakers` | `2` | Number of speakers for diarization (set to `3` for multi-speaker multi-scene podcasts) |
 | `--camera-switch` | `False` | Enable camera-switch mode for podcasts — full 9:16 crop switches to the active speaker; blurred pillarbox on simultaneous speech (9:16 only, requires `HF_TOKEN`) |
 | `--switch-hold-duration` | `2.0` | Min seconds to hold on current speaker before switching (camera-switch only) |
 
 ## 🎙️ Podcast Mode Comparison
 
-When processing 2-speaker podcast videos, two specialized modes are available that use **Speaker Diarization** (Pyannote) to intelligently manage the layout.
+When processing podcast videos, two specialized modes are available that use **Speaker Diarization** (Pyannote) to intelligently manage the layout. Both modes support **3+ speakers across multiple scenes** (e.g., 2 speakers in one camera shot + 1 speaker in a separate shot).
 
 ### 1. **`--split-screen`**
-This mode permanently divides the screen into two sections to display both speakers simultaneously.
+This mode permanently divides the screen into two sections to display speakers simultaneously.
 *   **Layout:** **Top-Bottom** split.
-*   **How it works:** Places Speaker A in the top half and Speaker B in the bottom half of the 9:16 frame.
-*   **Pros:** Allows viewers to see both speakers' expressions and reactions at the same time, ideal for intense interaction formats.
+*   **How it works:** Places the top-2 most active speakers in fixed panels. Extra speakers (3rd, 4th…) temporarily take over a panel when they are talking.
+*   **Multi-scene support:** Per-speaker frozen frame cache ensures correct content even when a speaker's dedicated scene is not currently playing.
+*   **Pros:** Allows viewers to see two speakers' expressions and reactions at the same time.
 
 ### 2. **`--camera-switch`**
 This mode mimics professional editing styles where a full-screen crop focuses only on the currently active speaker.
 *   **Layout:** Dynamic **Full 9:16** switching.
 *   **How it works:**
     *   **Single speaker active** -> Full crop on that speaker's face.
-    *   **Overlap/Both speaking** -> **Blurred Pillarbox** (original video centered with blurred background).
+    *   **Multiple speakers, same scene** -> **Blurred Pillarbox** (original video centered with blurred background).
+    *   **Multiple speakers, different scenes** -> Stays focused on the current speaker (no pillarbox).
     *   **Silence** -> Stays on the last active speaker.
-*   **Pros:** Feels more dynamic and cinematic, providing full focus on the subject who is talking.
+*   **Pros:** Feels more dynamic and cinematic, with scene-aware intelligence that avoids unnecessary wide-shots.
 
 ### **Comparison Table**
 
 | Feature | `--split-screen` | `--camera-switch` |
 | :--- | :--- | :--- |
 | **Visual Layout** | Top-Bottom Split | Full Screen (Switching) |
-| **Face Overlay** | Always 2 faces | 1 face (2 during overlap) |
+| **Face Overlay** | Always 2 faces | 1 face (wide-shot on same-scene overlap) |
+| **Multi-Speaker** | ✅ 3+ speakers, per-speaker fallback | ✅ 3+ speakers, scene-aware switching |
 | **Video Feel** | Informative & Complete | Dynamic & Cinematic |
 | **Priority** | High (Primary) | Lower |
 

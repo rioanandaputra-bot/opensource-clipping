@@ -21,8 +21,8 @@
 | **Auto-Thumbnail** | Ekstraksi frame dengan overlay gelap dan teks judul besar |
 | **Metadata Lintas Platform** | Judul/deskripsi/tag YouTube + caption TikTok — semua dalam Bahasa Inggris |
 | **Auto YouTube Uploader** | Upload klip highlight beserta metadata ke YouTube secara otomatis dengan penjadwalan (opsional) |
-| **Podcast Split-Screen** | Diarization speaker otomatis via **Pyannote** dengan layout split-screen atas-bawah untuk podcast 2 orang (9:16) |
-| **Podcast Camera Switch** | Deteksi speaker aktif otomatis yang switch crop full 9:16 ke orang yang sedang berbicara; blurred pillarbox saat keduanya bicara bersamaan (9:16) |
+| **Podcast Split-Screen** | Diarization speaker otomatis via **Pyannote** dengan layout split-screen atas-bawah untuk podcast (9:16). Mendukung **3+ speaker lintas scene** dengan frozen frame fallback per-speaker |
+| **Podcast Camera Switch** | Deteksi speaker aktif otomatis dengan switching yang scene-aware — crop full 9:16 fokus ke pembicara aktif; blurred pillarbox hanya saat speaker di scene yang sama bicara bersamaan (9:16) |
 
 ## 📋 Prasyarat
 
@@ -125,6 +125,13 @@ python main.py --url "https://youtube.com/watch?v=PODCAST_ID" \
   --ratio "9:16" \
   --camera-switch \
   --switch-hold-duration 2.0
+
+# Mode Multi-Speaker Podcast (3 speaker lintas 2 scene)
+python main.py --url "https://youtube.com/watch?v=PODCAST_ID" \
+  --clips 3 \
+  --ratio "9:16" \
+  --camera-switch \
+  --diarization-speakers 3
 ```
 
 ## ⚙️ Opsi CLI
@@ -154,36 +161,39 @@ python main.py --help
 | `--whisper-compute-type` | `float16` | Tipe komputasi Whisper (`float16`, `int8`, dll) |
 | `--gemini-model` | `gemini-3-flash-preview` | Nama model Gemini |
 | `--gemini-fallback-model` | `gemini-2.5-flash` | Nama model fallback Gemini jika model utama gagal |
-| `--split-screen` | `False` | Aktifkan mode split-screen untuk podcast 2 speaker (hanya 9:16, butuh `HF_TOKEN`) |
-| `--diarization-speakers` | `2` | Jumlah speaker untuk diarization (digunakan dengan `--split-screen`) |
+| `--split-screen` | `False` | Aktifkan mode split-screen untuk podcast (hanya 9:16, butuh `HF_TOKEN`). Mendukung 3+ speaker lintas scene |
+| `--diarization-speakers` | `2` | Jumlah speaker untuk diarization (set ke `3` untuk podcast multi-speaker multi-scene) |
 | `--camera-switch` | `False` | Aktifkan mode camera-switch untuk podcast — crop full 9:16 berpindah ke speaker aktif; blurred pillarbox saat kedua speaker bicara bersamaan (hanya 9:16, butuh `HF_TOKEN`) |
 | `--switch-hold-duration` | `2.0` | Durasi minimum (detik) sebelum berpindah speaker (hanya untuk camera-switch) |
 
 ## 🎙️ Perbedaan Mode Podcast
 
-Jika Anda memproses video podcast dengan 2 orang pembicara, tersedia dua mode khusus yang menggunakan **Speaker Diarization** (Pyannote) untuk mengatur tampilan secara cerdas.
+Jika Anda memproses video podcast, tersedia dua mode khusus yang menggunakan **Speaker Diarization** (Pyannote) untuk mengatur tampilan secara cerdas. Kedua mode mendukung **3+ speaker lintas beberapa scene** (misal: 2 speaker dalam 1 shot kamera + 1 speaker di shot terpisah).
 
 ### 1. **`--split-screen` (Layar Terpisah)**
-Mode ini membagi layar menjadi dua bagian secara permanen untuk menampilkan kedua pembicara sekaligus.
+Mode ini membagi layar menjadi dua bagian secara permanen untuk menampilkan pembicara.
 *   **Tampilan:** Layout **Top-Bottom** (Atas-Bawah).
-*   **Cara Kerja:** Menempatkan Speaker A di bagian atas dan Speaker B di bagian bawah layar 9:16.
-*   **Kelebihan:** Penonton dapat melihat ekspresi dan reaksi kedua orang secara bersamaan, sangat cocok untuk format interaksi intens.
+*   **Cara Kerja:** Menempatkan 2 speaker paling aktif di panel tetap. Speaker tambahan (ke-3, ke-4…) sementara mengambil alih panel saat mereka berbicara.
+*   **Dukungan multi-scene:** Cache frozen frame per-speaker memastikan konten panel selalu benar walau scene speaker belum tampil.
+*   **Kelebihan:** Penonton dapat melihat ekspresi dan reaksi kedua pembicara sekaligus.
 
 ### 2. **`--camera-switch` (Ganti Kamera Otomatis)**
 Mode ini meniru gaya editing profesional di mana layar penuh hanya fokus pada satu orang yang sedang berbicara aktif.
 *   **Tampilan:** **Full 9:16** yang berpindah-pindah.
 *   **Cara Kerja:**
     *   **Satu pembicara aktif** -> Crop penuh pada wajah pembicara tersebut.
-    *   **Keduanya bicara/overlap** -> **Blurred Pillarbox** (video asli diletakkan di tengah dengan background blur).
+    *   **Beberapa speaker, scene yang sama** -> **Blurred Pillarbox** (video asli diletakkan di tengah dengan background blur).
+    *   **Beberapa speaker, scene berbeda** -> Tetap fokus pada speaker saat ini (tanpa pillarbox).
     *   **Hening** -> Tetap pada pembicara terakhir yang aktif.
-*   **Kelebihan:** Video terasa lebih dinamis dan sinematik, memberikan fokus penuh pada subjek yang sedang berbicara.
+*   **Kelebihan:** Video terasa lebih dinamis dan sinematik, dengan kecerdasan scene-aware yang menghindari wide-shot yang tidak perlu.
 
 ### **Tabel Perbandingan**
 
 | Fitur | `--split-screen` | `--camera-switch` |
 | :--- | :--- | :--- |
 | **Layout Visual** | Split Atas-Bawah | Layar Penuh (Switching) |
-| **Overlay Wajah** | Selalu 2 orang | 1 orang (2 jika overlap) |
+| **Overlay Wajah** | Selalu 2 orang | 1 orang (wide-shot saat overlap di scene sama) |
+| **Multi-Speaker** | ✅ 3+ speaker, fallback per-speaker | ✅ 3+ speaker, switching scene-aware |
 | **Kesan Video** | Informatif & Lengkap | Dinamis & Sinematik |
 | **Prioritas** | Tinggi (Utama) | Lebih Rendah |
 
@@ -272,8 +282,8 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 - `--use-dlp-subs` : Aktifkan pengunduhan subtitle bawaan YouTube (jika tersedia) untuk bypass proses AI Whisper (sangat menghemat waktu komputasi).
 
 **🎙️ Pengaturan Split-Screen (Podcast)**
-- `--split-screen` : Aktifkan mode split-screen atas-bawah untuk video podcast dengan 2 speaker. Menggunakan **Pyannote** untuk mendeteksi siapa yang berbicara.
-- `--diarization-speakers` : Jumlah speaker yang diharapkan (default: 2). Memerlukan `HF_TOKEN` di file `.env`.
+- `--split-screen` : Aktifkan mode split-screen atas-bawah untuk video podcast. Mendukung **3+ speaker lintas scene**. Menggunakan **Pyannote** untuk mendeteksi siapa yang berbicara.
+- `--diarization-speakers` : Jumlah speaker yang diharapkan (default: 2, set ke `3` untuk podcast 3 orang). Memerlukan `HF_TOKEN` di file `.env`.
 
 > ⚠️ **Catatan**: Untuk menggunakan split-screen, Anda perlu:
 > 1. Mendaftarkan akun di [HuggingFace](https://huggingface.co/) dan membuat token
@@ -281,12 +291,13 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 > 3. Menambahkan `HF_TOKEN=your-token` di file `.env`
 
 **📹 Pengaturan Camera Switch (Podcast)**
-- `--camera-switch` : Aktifkan mode camera-switch penuh — video 9:16 bergantian mengikuti speaker yang aktif seperti kamera beralih live. **Mutually exclusive** dengan `--split-screen` (split-screen lebih prioritas jika keduanya diaktifkan).
+- `--camera-switch` : Aktifkan mode camera-switch penuh — video 9:16 bergantian mengikuti speaker yang aktif. **Scene-aware**: blurred pillarbox hanya muncul saat speaker di scene yang sama bicara bersamaan; jika speaker dari scene berbeda, tetap fokus ke speaker saat ini. **Mutually exclusive** dengan `--split-screen` (split-screen lebih prioritas jika keduanya diaktifkan).
 - `--switch-hold-duration` : Durasi minimum (detik) sebelum sistem berpindah speaker (default: `2.0`). Berguna agar tidak flickering saat pergantian cepat.
 
-> 💡 **Tiga skenario rendering Camera Switch:**
+> 💡 **Skenario rendering Camera Switch:**
 > - **Satu speaker aktif** → crop full 9:16 mengikuti wajah speaker tersebut
-> - **Dua speaker bicara bersamaan** → **blurred pillarbox** (frame 16:9 asli diletakkan di tengah, sisi kiri-kanan diisi blur background — tidak ada bar hitam)
+> - **Beberapa speaker aktif, scene sama** → **blurred pillarbox** (frame 16:9 asli diletakkan di tengah, sisi diisi blur background)
+> - **Beberapa speaker aktif, scene berbeda** → tetap fokus ke speaker saat ini (tanpa pillarbox)
 > - **Tidak ada yang bicara** → tetap pada speaker terakhir yang aktif
 
 **🌐 Asset Eksternal**

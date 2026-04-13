@@ -1301,7 +1301,7 @@ def buat_video_split_screen(
     label : str
         Label for progress logging.
     """
-    from .diarization import get_active_speaker
+    from .diarization import get_active_speaker, get_active_speakers
 
     STEP_DETEKSI = 0.5
     DEADZONE_RATIO = 0.25
@@ -1358,26 +1358,44 @@ def buat_video_split_screen(
     default_x = (width - crop_w) // 2
     default_y = (height - crop_h) // 2
 
-    # Get unique speakers sorted
-    speakers = sorted(set(s["speaker"] for s in diarization_data))
-    if len(speakers) < 2:
-        speakers = (
-            [speakers[0], speakers[0]] if speakers else ["SPEAKER_00", "SPEAKER_01"]
-        )
+    # ----------------------------------------------------------------
+    # Determine top/bottom panel speakers by speaking time in this clip
+    # ----------------------------------------------------------------
+    all_speakers_in_clip = sorted(set(s["speaker"] for s in diarization_data))
+    if not all_speakers_in_clip:
+        all_speakers_in_clip = ["SPEAKER_00", "SPEAKER_01"]
 
-    speaker_top = speakers[0]
-    speaker_bottom = speakers[1]
+    speaking_time: dict[str, float] = {spk: 0.0 for spk in all_speakers_in_clip}
+    for seg in diarization_data:
+        eff_start = max(seg["start"], start_clip)
+        eff_end = min(seg["end"], end_clip)
+        if eff_end > eff_start:
+            speaking_time[seg["speaker"]] += eff_end - eff_start
 
-    # ---- FASE 1: DETECT ALL FACES & ASSIGN TO SPEAKERS ----
-    # We detect all faces per frame, then assign them to top/bottom speaker
-    # based on horizontal position (leftmost = speaker_top, rightmost = speaker_bottom)
+    # Top-2 speakers by speaking time own the permanent panel slots
+    ranked = sorted(all_speakers_in_clip, key=lambda s: speaking_time[s], reverse=True)
+    speaker_top = ranked[0]
+    speaker_bottom = ranked[1] if len(ranked) > 1 else ranked[0]
+    extra_speakers = ranked[2:]  # 3rd, 4th, … speakers
+
+    # ---- FASE 1: DETECT ALL FACES & ASSIGN TO SPEAKERS (diarization-guided) ----
+    # Strategy:
+    #   1 active + 1 face  → trivial: face belongs to active speaker
+    #   N active + N faces → sort faces by X; sort active speakers by label; assign in order
+    #   1 active + N faces → use speaker's last-known position to pick nearest face
+    #   otherwise          → skip (ambiguous or no data)
 
     print(f"🧠 {label} - Analisa wajah (split-screen) dimulai...", flush=True)
 
-    raw_data_top = []
-    raw_data_bottom = []
+    all_frame_data: list[dict] = []  # [{time, face_centers, active_now}]
+    speaker_solo_cxs: dict[str, list] = {}  # speaker → [cx, ...] from 1:1 frames
+    solo_counts: dict[str, int] = {spk: 0 for spk in all_speakers_in_clip}
+    multi_counts: dict[str, int] = {spk: 0 for spk in all_speakers_in_clip}
     current_time = 0.0
     last_detect_percent = -1
+
+    def _clamp_x(cx_center: float) -> int:
+        return max(0, min(int(cx_center - crop_w / 2), width - crop_w))
 
     while current_time <= duration:
         cap.set(cv2.CAP_PROP_POS_MSEC, (start_clip + current_time) * 1000)
@@ -1385,7 +1403,7 @@ def buat_video_split_screen(
         if not ret:
             break
 
-        face_centers = []  # list of (center_x, center_y)
+        face_centers = []
 
         if cfg.face_detector == "yolo":
             yolo_results = yolo_model(frame, verbose=False)
@@ -1410,33 +1428,28 @@ def buat_video_split_screen(
                     cy = bb.origin_y + bb.height / 2
                     face_centers.append((cx, cy))
 
-        # Sort by horizontal position (left to right)
-        face_centers.sort(key=lambda fc: fc[0])
+        face_centers.sort(key=lambda fc: fc[0])  # left → right
+        active_now = get_active_speakers(diarization_data, start_clip + current_time)
+        n_faces = len(face_centers)
+        n_active = len(active_now)
 
-        # Assign: leftmost face → speaker_top (panel atas), rightmost → speaker_bottom
-        if len(face_centers) >= 2:
-            top_cx = face_centers[0][0]
-            bottom_cx = face_centers[-1][0]
-        elif len(face_centers) == 1:
-            # Only one face detected — assign to whoever is speaking
-            active = get_active_speaker(diarization_data, start_clip + current_time)
-            if active == speaker_bottom:
-                top_cx = default_x + crop_w / 2  # default for top
-                bottom_cx = face_centers[0][0]
-            else:
-                top_cx = face_centers[0][0]
-                bottom_cx = default_x + crop_w / 2  # default for bottom
-        else:
-            # No face — use defaults
-            top_cx = default_x + crop_w / 2
-            bottom_cx = default_x + crop_w / 2
+        # Pass A: collect face data and track canonical solo observations.
+        # Full assignment happens in Pass B after canonical_cx is built from entire clip.
+        if n_faces == 1 and n_active == 1:
+            spk = active_now[0]
+            speaker_solo_cxs.setdefault(spk, []).append(face_centers[0][0])
+            solo_counts[spk] = solo_counts.get(spk, 0) + 1
+        elif n_faces >= 2 and n_active >= 1:
+            for spk in active_now:
+                multi_counts[spk] = multi_counts.get(spk, 0) + 1
 
-        # Convert center_x to crop x position
-        top_x = max(0, min(int(top_cx - crop_w / 2), width - crop_w))
-        bottom_x = max(0, min(int(bottom_cx - crop_w / 2), width - crop_w))
-
-        raw_data_top.append({"time": current_time, "x": top_x})
-        raw_data_bottom.append({"time": current_time, "x": bottom_x})
+        all_frame_data.append(
+            {
+                "time": current_time,
+                "face_centers": face_centers,
+                "active_now": active_now,
+            }
+        )
 
         detect_percent = (
             min(100, int((current_time / duration) * 100)) if duration > 0 else 100
@@ -1446,6 +1459,85 @@ def buat_video_split_screen(
             last_detect_percent = detect_percent
 
         current_time += STEP_DETEKSI
+
+    # Build canonical center-X per speaker from 1:1 frames (median, robust to outliers)
+    import statistics as _stats
+
+    speaker_canonical_cx: dict[str, float] = {
+        spk: _stats.median(cxs) for spk, cxs in speaker_solo_cxs.items() if cxs
+    }
+
+    # Determine which speakers appear mostly in solo-scene frames
+    speaker_is_solo: dict[str, bool] = {
+        spk: (solo_counts.get(spk, 0) > multi_counts.get(spk, 0))
+        for spk in all_speakers_in_clip
+    }
+
+    # ================================================================
+    # Pass B — Canonical-guided face-to-speaker assignment
+    # ================================================================
+    # Re-process all stored frames using canonical_cx built from the entire clip.
+    # This handles multi-scene videos correctly: e.g. in a 3-speaker podcast where
+    # Speaker C's solo canonical_cx (center of Scene B) can be used to *eliminate*
+    # that face from Scene A frames, leaving the correct face for Speaker A/B.
+    # ================================================================
+    raw_data: dict[str, list] = {spk: [] for spk in all_speakers_in_clip}
+
+    for fd in all_frame_data:
+        fc_list = fd["face_centers"]  # list of (cx, cy), sorted left → right
+        act_list = fd["active_now"]
+        nf = len(fc_list)
+        na = len(act_list)
+
+        if nf == 0 or na == 0:
+            continue
+
+        if nf == 1 and na == 1:
+            spk = act_list[0]
+            if spk in raw_data:
+                raw_data[spk].append({"time": fd["time"], "x": _clamp_x(fc_list[0][0])})
+
+        elif nf >= 2 and na >= 2:
+            # Greedy canonical assignment: sort active speakers by canonical X,
+            # each picks their nearest remaining face.
+            remaining = list(fc_list)
+            for spk in sorted(
+                act_list, key=lambda s: speaker_canonical_cx.get(s, width / 2)
+            ):
+                if not remaining or spk not in raw_data:
+                    break
+                best = min(
+                    remaining,
+                    key=lambda fc: abs(
+                        fc[0] - speaker_canonical_cx.get(spk, width / 2)
+                    ),
+                )
+                remaining.remove(best)
+                raw_data[spk].append({"time": fd["time"], "x": _clamp_x(best[0])})
+
+        elif nf >= 2 and na == 1:
+            spk = act_list[0]
+            if spk not in raw_data:
+                continue
+            # Step 1: eliminate faces claimed by OTHER speakers with known canonical positions
+            remaining = list(fc_list)
+            for other in all_speakers_in_clip:
+                if other == spk or other not in speaker_canonical_cx or not remaining:
+                    continue
+                claimed = min(
+                    remaining, key=lambda fc: abs(fc[0] - speaker_canonical_cx[other])
+                )
+                remaining.remove(claimed)
+            # Step 2: from remaining (or full list if exhausted), pick best for this speaker
+            pool = remaining if remaining else fc_list
+            if raw_data[spk]:
+                last_cx = raw_data[spk][-1]["x"] + crop_w / 2
+                best = min(pool, key=lambda fc: abs(fc[0] - last_cx))
+            elif spk in speaker_canonical_cx:
+                best = min(pool, key=lambda fc: abs(fc[0] - speaker_canonical_cx[spk]))
+            else:
+                best = pool[len(pool) // 2]
+            raw_data[spk].append({"time": fd["time"], "x": _clamp_x(best[0])})
 
     # ---- FASE 2: SMOOTH CAMERA PER SPEAKER ----
     def _smooth_positions(raw_data):
@@ -1472,20 +1564,22 @@ def buat_video_split_screen(
             smooth.append({"time": d["time"], "x": final_x})
         return smooth
 
-    smooth_top = _smooth_positions(raw_data_top)
-    smooth_bottom = _smooth_positions(raw_data_bottom)
+    smooth: dict[str, list] = {
+        spk: _smooth_positions(raw_data[spk]) for spk in all_speakers_in_clip
+    }
 
-    def _get_x(smooth_data, t):
-        if not smooth_data:
+    def _get_x(speaker: str, t: float) -> int:
+        sd = smooth.get(speaker, [])
+        if not sd:
             return default_x
-        if t <= smooth_data[0]["time"]:
-            return smooth_data[0]["x"]
-        if t >= smooth_data[-1]["time"]:
-            return smooth_data[-1]["x"]
-        for i in range(len(smooth_data) - 1):
-            if smooth_data[i]["time"] <= t <= smooth_data[i + 1]["time"]:
-                t1, t2 = smooth_data[i]["time"], smooth_data[i + 1]["time"]
-                x1, x2 = smooth_data[i]["x"], smooth_data[i + 1]["x"]
+        if t <= sd[0]["time"]:
+            return sd[0]["x"]
+        if t >= sd[-1]["time"]:
+            return sd[-1]["x"]
+        for i in range(len(sd) - 1):
+            if sd[i]["time"] <= t <= sd[i + 1]["time"]:
+                t1, t2 = sd[i]["time"], sd[i + 1]["time"]
+                x1, x2 = sd[i]["x"], sd[i + 1]["x"]
                 if t1 == t2:
                     return x1
                 return int(x1 + (x2 - x1) * (t - t1) / (t2 - t1))
@@ -1498,6 +1592,9 @@ def buat_video_split_screen(
 
     # Pre-create overlay for inactive speaker
     dark_overlay = np.zeros((panel_h, panel_w, 3), dtype=np.uint8)
+    # Per-speaker frozen frame cache: stores last valid crop for each speaker
+    # so any panel can fallback when its speaker is not in the current scene
+    last_valid_crop: dict[str, np.ndarray] = {}
 
     try:
         cap.set(cv2.CAP_PROP_POS_MSEC, start_clip * 1000)
@@ -1518,36 +1615,68 @@ def buat_video_split_screen(
             timestamp_abs = start_clip + t
             active_speaker = get_active_speaker(diarization_data, timestamp_abs)
 
-            # Crop for top speaker
-            cx_top = _get_x(smooth_top, t)
-            panel_top = frame[0:crop_h, cx_top : cx_top + crop_w]
-            panel_top = cv2.resize(panel_top, (panel_w, panel_h))
+            # Determine which speakers populate each panel this frame
+            # Extra speakers (3rd, 4th…) temporarily take over one panel
+            if active_speaker and active_speaker not in (speaker_top, speaker_bottom):
+                # 3rd-party speaker is active → show them in top panel,
+                # keep the OTHER primary speaker (not the active extra) in bottom
+                panel_top_spk = active_speaker
+                panel_bottom_spk = speaker_bottom
+            else:
+                panel_top_spk = speaker_top
+                panel_bottom_spk = speaker_bottom
 
-            # Crop for bottom speaker
-            cx_bottom = _get_x(smooth_bottom, t)
-            panel_bottom = frame[0:crop_h, cx_bottom : cx_bottom + crop_w]
-            panel_bottom = cv2.resize(panel_bottom, (panel_w, panel_h))
+            # Detect whether the current scene is a solo shot
+            in_solo_scene = bool(
+                active_speaker and speaker_is_solo.get(active_speaker, False)
+            )
 
-            # Apply active/inactive styling
-            if active_speaker == speaker_bottom:
-                # Top is inactive — darken it
-                panel_top = cv2.addWeighted(
-                    panel_top, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0
+            # ---- Helper: build a panel crop for a given speaker ----
+            def _build_panel(spk, is_other_panel_spk=False):
+                """Return (panel_img, used_fallback) for the given speaker."""
+                # Check if this speaker is NOT visible in the current frame
+                spk_not_visible = (
+                    active_speaker in all_speakers_in_clip
+                    and active_speaker != spk
+                    and (
+                        speaker_is_solo.get(spk, False)
+                        or (
+                            in_solo_scene
+                            and not speaker_is_solo.get(spk, False)
+                        )
+                    )
                 )
-                # Bottom is active — add highlight border
-                cv2.rectangle(
-                    panel_bottom,
-                    (0, 0),
-                    (panel_w - 1, panel_h - 1),
-                    (0, 255, 255),
-                    ACTIVE_BORDER,
-                )
-            elif active_speaker == speaker_top:
-                # Bottom is inactive — darken it
+                if spk_not_visible:
+                    # Use frozen frame for this speaker
+                    if spk in last_valid_crop:
+                        return last_valid_crop[spk].copy(), True
+                    else:
+                        return cv2.resize(
+                            frame[0:crop_h, default_x : default_x + crop_w],
+                            (panel_w, panel_h),
+                        ), True
+                else:
+                    cx = _get_x(spk, t)
+                    crop = cv2.resize(
+                        frame[0:crop_h, cx : cx + crop_w],
+                        (panel_w, panel_h),
+                    )
+                    # Update frozen frame cache when speaker is actually visible
+                    if not in_solo_scene or active_speaker == spk:
+                        last_valid_crop[spk] = crop.copy()
+                    return crop, False
+
+            # ---- Top panel ----
+            panel_top, is_fallback_top = _build_panel(panel_top_spk)
+
+            # ---- Bottom panel ----
+            panel_bottom, is_fallback_bottom = _build_panel(panel_bottom_spk)
+
+            # ---- Active / inactive highlighting ----
+            if active_speaker == panel_top_spk:
                 panel_bottom = cv2.addWeighted(
                     panel_bottom, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0
                 )
-                # Top is active — add highlight border
                 cv2.rectangle(
                     panel_top,
                     (0, 0),
@@ -1555,7 +1684,27 @@ def buat_video_split_screen(
                     (0, 255, 255),
                     ACTIVE_BORDER,
                 )
-            # else: both panels equal (no one speaking or transition)
+            elif active_speaker == panel_bottom_spk:
+                panel_top = cv2.addWeighted(
+                    panel_top, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0
+                )
+                cv2.rectangle(
+                    panel_bottom,
+                    (0, 0),
+                    (panel_w - 1, panel_h - 1),
+                    (0, 255, 255),
+                    ACTIVE_BORDER,
+                )
+            else:
+                # Dim any fallback panels so the active panel stands out
+                if is_fallback_top:
+                    panel_top = cv2.addWeighted(
+                        panel_top, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0
+                    )
+                if is_fallback_bottom:
+                    panel_bottom = cv2.addWeighted(
+                        panel_bottom, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0
+                    )
 
             # Compose the final frame: top panel + divider + bottom panel
             divider = np.full(
@@ -1679,23 +1828,30 @@ def buat_video_camera_switch(
 
     default_x = (width - crop_w) // 2
 
-    # Unique speakers sorted
+    # All unique speakers in this clip
     speakers = sorted(set(s["speaker"] for s in diarization_data))
-    if len(speakers) < 2:
-        speakers = (
-            [speakers[0], speakers[0]] if speakers else ["SPEAKER_00", "SPEAKER_01"]
-        )
-    speaker_a = speakers[0]  # leftmost  (smaller X)
-    speaker_b = speakers[1]  # rightmost (larger  X)
+    if not speakers:
+        speakers = ["SPEAKER_00"]
 
     # ================================================================
-    # FASE 1 — Detect all faces & assign to speakers by X position
+    # FASE 1 — Per-speaker face profiling (diarization-guided)
     # ================================================================
+    # Strategy:
+    #   1 active + 1 face  → trivial: face belongs to active speaker
+    #   N active + N faces → sort faces by X; sort speakers by label; assign in order
+    #   1 active + N faces → use speaker's last-known position to pick nearest face
+    #   otherwise          → skip (ambiguous / no data)
     print(f"🧠 {label} - Analisa wajah (camera switch) dimulai...", flush=True)
 
-    raw_data = {speaker_a: [], speaker_b: []}
+    all_frame_data: list[dict] = []  # [{time, face_centers, active_now}]
+    speaker_solo_cxs: dict[str, list] = {}  # speaker → [cx, ...] from 1:1 frames
+    solo_counts: dict[str, int] = {spk: 0 for spk in speakers}
+    multi_counts: dict[str, int] = {spk: 0 for spk in speakers}
     current_time = 0.0
     last_detect_percent = -1
+
+    def _clamp_x_cs(cx_center: float) -> int:
+        return max(0, min(int(cx_center - crop_w / 2), width - crop_w))
 
     while current_time <= duration:
         cap.set(cv2.CAP_PROP_POS_MSEC, (start_clip + current_time) * 1000)
@@ -1730,33 +1886,25 @@ def buat_video_camera_switch(
                     )
 
         face_centers.sort(key=lambda fc: fc[0])  # left → right
+        active_now = get_active_speakers(diarization_data, start_clip + current_time)
+        n_faces = len(face_centers)
+        n_active = len(active_now)
 
-        if len(face_centers) >= 2:
-            ax = face_centers[0][0]
-            bx = face_centers[-1][0]
-        elif len(face_centers) == 1:
-            active_now = get_active_speakers(
-                diarization_data, start_clip + current_time
-            )
-            if speaker_b in active_now and speaker_a not in active_now:
-                ax = default_x + crop_w / 2
-                bx = face_centers[0][0]
-            else:
-                ax = face_centers[0][0]
-                bx = default_x + crop_w / 2
-        else:
-            ax = bx = default_x + crop_w / 2
+        # Pass A: collect face data and build canonical solo observations.
+        # Full assignment happens in Pass B after canonical_cx is built from entire clip.
+        if n_faces == 1 and n_active == 1:
+            spk = active_now[0]
+            speaker_solo_cxs.setdefault(spk, []).append(face_centers[0][0])
+            solo_counts[spk] = solo_counts.get(spk, 0) + 1
+        elif n_faces >= 2 and n_active >= 1:
+            for spk in active_now:
+                multi_counts[spk] = multi_counts.get(spk, 0) + 1
 
-        raw_data[speaker_a].append(
+        all_frame_data.append(
             {
                 "time": current_time,
-                "x": max(0, min(int(ax - crop_w / 2), width - crop_w)),
-            }
-        )
-        raw_data[speaker_b].append(
-            {
-                "time": current_time,
-                "x": max(0, min(int(bx - crop_w / 2), width - crop_w)),
+                "face_centers": face_centers,
+                "active_now": active_now,
             }
         )
 
@@ -1768,6 +1916,82 @@ def buat_video_camera_switch(
             last_detect_percent = detect_pct
 
         current_time += STEP_DETEKSI
+
+    # Build canonical center-X per speaker from 1:1 frames
+    import statistics as _stats
+
+    speaker_canonical_cx: dict[str, float] = {
+        spk: _stats.median(cxs) for spk, cxs in speaker_solo_cxs.items() if cxs
+    }
+
+    # Determine which speakers appear mostly in solo-scene frames
+    speaker_is_solo: dict[str, bool] = {
+        spk: (solo_counts.get(spk, 0) > multi_counts.get(spk, 0))
+        for spk in speakers
+    }
+
+    # ================================================================
+    # Pass B — Canonical-guided face-to-speaker assignment
+    # ================================================================
+    # Re-process all stored frames using canonical_cx built from entire clip.
+    # Multi-scene videos: Speaker C's solo canonical eliminates their face from
+    # Scene A frames, leaving the correct face for Scene A speakers.
+    # ================================================================
+    raw_data: dict[str, list] = {spk: [] for spk in speakers}
+
+    for fd in all_frame_data:
+        fc_list = fd["face_centers"]
+        act_list = fd["active_now"]
+        nf = len(fc_list)
+        na = len(act_list)
+
+        if nf == 0 or na == 0:
+            continue
+
+        if nf == 1 and na == 1:
+            spk = act_list[0]
+            if spk in raw_data:
+                raw_data[spk].append(
+                    {"time": fd["time"], "x": _clamp_x_cs(fc_list[0][0])}
+                )
+
+        elif nf >= 2 and na >= 2:
+            remaining = list(fc_list)
+            for spk in sorted(
+                act_list, key=lambda s: speaker_canonical_cx.get(s, width / 2)
+            ):
+                if not remaining or spk not in raw_data:
+                    break
+                best = min(
+                    remaining,
+                    key=lambda fc: abs(
+                        fc[0] - speaker_canonical_cx.get(spk, width / 2)
+                    ),
+                )
+                remaining.remove(best)
+                raw_data[spk].append({"time": fd["time"], "x": _clamp_x_cs(best[0])})
+
+        elif nf >= 2 and na == 1:
+            spk = act_list[0]
+            if spk not in raw_data:
+                continue
+            remaining = list(fc_list)
+            for other in speakers:
+                if other == spk or other not in speaker_canonical_cx or not remaining:
+                    continue
+                claimed = min(
+                    remaining, key=lambda fc: abs(fc[0] - speaker_canonical_cx[other])
+                )
+                remaining.remove(claimed)
+            pool = remaining if remaining else fc_list
+            if raw_data[spk]:
+                last_cx = raw_data[spk][-1]["x"] + crop_w / 2
+                best = min(pool, key=lambda fc: abs(fc[0] - last_cx))
+            elif spk in speaker_canonical_cx:
+                best = min(pool, key=lambda fc: abs(fc[0] - speaker_canonical_cx[spk]))
+            else:
+                best = pool[len(pool) // 2]
+            raw_data[spk].append({"time": fd["time"], "x": _clamp_x_cs(best[0])})
 
     # ================================================================
     # FASE 2 — Smooth per-speaker camera positions
@@ -1794,9 +2018,8 @@ def buat_video_camera_switch(
             smooth.append({"time": d["time"], "x": final_x})
         return smooth
 
-    smooth = {
-        speaker_a: _smooth_positions(raw_data[speaker_a]),
-        speaker_b: _smooth_positions(raw_data[speaker_b]),
+    smooth: dict[str, list] = {
+        spk: _smooth_positions(raw_data[spk]) for spk in speakers
     }
 
     def _get_x(speaker, t):
@@ -1871,8 +2094,26 @@ def buat_video_camera_switch(
             active_speakers = get_active_speakers(diarization_data, timestamp_abs)
 
             if len(active_speakers) >= 2:
-                # Simultaneous speech → blurred pillarbox wide-shot
-                out_frame = _make_blurred_pillarbox(frame)
+                # Scene-aware simultaneous speech:
+                # Only use blurred pillarbox (wide-shot) if ALL active speakers
+                # are multi-scene type (i.e. they share the same physical frame).
+                # If any active speaker is solo-scene type, they're in a different
+                # scene entirely — stay on the current speaker instead of wide-shot.
+                all_multi_scene = all(
+                    not speaker_is_solo.get(spk, False) for spk in active_speakers
+                )
+                if all_multi_scene:
+                    # All speakers are in the same scene → blurred pillarbox wide-shot
+                    out_frame = _make_blurred_pillarbox(frame)
+                else:
+                    # Mixed scenes: at least one speaker is solo-scene type.
+                    # Stay on current speaker, or pick the first active speaker.
+                    if current_speaker is None or current_speaker not in active_speakers:
+                        current_speaker = active_speakers[0]
+                        last_switch_time = t
+                    cx = _get_x(current_speaker, t)
+                    crop_fr = frame[0:crop_h, cx : cx + crop_w]
+                    out_frame = cv2.resize(crop_fr, (out_w, out_h))
 
             elif len(active_speakers) == 1:
                 new_speaker = active_speakers[0]
@@ -1944,9 +2185,6 @@ def proses_klip(
     m_end = float(clip["end_time"])
     judul = clip.get("title_indonesia")
     judul_en = clip.get("title_inggris")
-    tiktok_title_id = clip.get("tiktok_title_id", "")
-    tiktok_caption_id = clip.get("tiktok_caption_id", "")
-
     out_vid = os.path.join(cfg.outputs_dir, f"highlight_rank_{rank}_ready.mp4")
     out_thm = os.path.join(cfg.outputs_dir, f"thumbnail_rank_{rank}.jpg")
 
@@ -1965,16 +2203,8 @@ def proses_klip(
         "tiktok_caption_final": clip.get(
             "tiktok_caption_final", clip.get("hastag", "")
         ),
-        "tiktok_title_id_final": clip.get(
-            "tiktok_title_id_final", clip.get("tiktok_title_id", "")
-        ),
-        "tiktok_caption_id_final": clip.get(
-            "tiktok_caption_id_final", clip.get("tiktok_caption_id", clip.get("hastag", ""))
-        ),
         "title_indonesia": clip.get("title_indonesia", ""),
         "title_inggris": clip.get("title_inggris", ""),
-        "tiktok_title_id": clip.get("tiktok_title_id", ""),
-        "tiktok_caption_id": clip.get("tiktok_caption_id", ""),
         "hastag": clip.get("hastag", ""),
         "start_time": m_start,
         "end_time": m_end,
@@ -1988,12 +2218,10 @@ def proses_klip(
 
     print(f"\n{'=' * 70}")
     print(f"🔥 [Rank {rank}] Memproses clip")
-    print(f"📝 [Judul Indo]         : '{clip.get('title_indonesia', '-')}'")
-    print(f"📝 [Judul Inggris]      : '{clip.get('title_inggris', '-')}'")
-    print(f"📝 [TikTok Title ID]    : '{clip.get('tiktok_title_id', '-')}'")
-    print(f"📝 [TikTok Caption ID]  : '{clip.get('tiktok_caption_id', '-')}'")
-    print(f"#️⃣ [Hastag]            : '{clip.get('hastag', '-')}'")
-    print(f"🧠 Encoder aktif        : {video_encoder['name']}")
+    print(f"📝 [Judul Indo]   : '{clip.get('title_indonesia', '-')}'")
+    print(f"📝 [Judul Inggris]: '{clip.get('title_inggris', '-')}'")
+    print(f"#️⃣ [Hastag]      : '{clip.get('hastag', '-')}'")
+    print(f"🧠 Encoder aktif  : {video_encoder['name']}")
     print(f"{'=' * 70}")
 
     typography_plan = clip.get("typography_plan", [])

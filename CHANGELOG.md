@@ -7,6 +7,21 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.7.2] - 2026-04-13
+
+### Improved
+- **Multi-Speaker Multi-Scene Podcast Support**: Both `--split-screen` and `--camera-switch` now handle podcast formats with **3+ speakers across multiple scenes** (e.g., 2 speakers in one camera shot + 1 speaker in a separate solo shot). Use `--diarization-speakers 3` to enable.
+  - **Split-Screen**: Per-speaker frozen frame cache — each speaker now has their own fallback crop instead of a single shared one. Both panels (top & bottom) can independently fall back to their speaker's last valid frame when the speaker is not visible in the current scene.
+  - **Camera-Switch**: Scene-aware simultaneous speech — when 2+ speakers talk simultaneously but are in **different scenes** (one is solo-scene type), the system stays on the current speaker instead of switching to blurred pillarbox. Wide-shot only triggers when all active speakers share the same physical frame.
+  - **Camera-Switch**: Added `speaker_is_solo` tracking to distinguish solo-scene speakers (appear alone in their shot) from multi-scene speakers (share a frame with others).
+  - **Split-Screen**: Refactored panel rendering into a reusable `_build_panel()` helper; both panels now use identical fallback logic.
+
+### Notes
+- Backward compatible with existing 2-speaker podcast workflows — no changes needed for standard usage.
+- For 3-speaker podcasts, set `--diarization-speakers 3` to let Pyannote detect all speakers correctly.
+
+---
+
 ## [v0.7.1] - 2026-04-08
 
 ### Added
