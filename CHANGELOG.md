@@ -7,6 +7,17 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.7.4] - 2026-04-18
+
+### Improved
+- **Optimized Face Tracking & Camera Responsiveness**: Fine-tuned internal camera parameters for tighter and faster centering during face tracking.
+  - **Higher Detection Frequency**: Increased face check rate to every 0.25s (previously 0.5s) to reduce camera lag in dynamic scenes.
+  - **Tighter Deadzone**: Reduced the safe "no-move" zone to 15% (previously 25%), ensuring the subject stays closer to the center of the frame.
+  - **Responsive Catch-up**: Increased smoothing speed to 30%, making the camera follow movement more assertively while maintaining fluid motion.
+  - **Micro-jitter Prevention**: Increased the jitter threshold to 5px to ensure a steady shot despite high-frequency AI detection updates.
+
+---
+
 ## [v0.7.3] - 2026-04-17
 
 ### Added
