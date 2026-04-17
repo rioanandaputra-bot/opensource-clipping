@@ -151,6 +151,7 @@ python main.py --help
 | `--no-broll` | — | Nonaktifkan footage B-roll |
 | `--no-hook` | — | Nonaktifkan hook glitch teaser |
 | `--no-bgm` | — | Nonaktifkan musik latar |
+| `--no-subs` | — | Nonaktifkan semua rendering subtitle |
 | `--no-karaoke` | — | Gunakan teks biasa tanpa highlight karaoke |
 | `--advanced-text` | `False` | Aktifkan typografi kinetik (skala kata & animasi pop) |
 | `--use-dlp-subs` | — | Unduh dan gunakan subtitle bawaan YouTube untuk mempercepat proses (melewati Whisper) |
@@ -275,6 +276,7 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 
 **🎨 Pengaturan Subtitle (ASS)**
 - `--font-style` : Pilih gaya font untuk subtitle
+- `--no-subs` : Matikan semua rendering subtitle (video bersih tanpa teks)
 - `--no-karaoke` : Matikan efek warna kuning per-kata, ganti dengan teks bersih muncul satu per satu
 - `--advanced-text` : Aktifkan efek scaling kata besar-kecil (kinetic typography)
 

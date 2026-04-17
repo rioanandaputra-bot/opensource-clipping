@@ -151,6 +151,7 @@ python main.py --help
 | `--no-broll` | — | Disable B-roll footage |
 | `--no-hook` | — | Disable hook glitch teaser |
 | `--no-bgm` | — | Disable background music |
+| `--no-subs` | — | Disable all subtitle rendering |
 | `--no-karaoke` | — | Use clean text instead of karaoke highlight |
 | `--advanced-text` | `False` | Enable kinetic typography (word scaling & animation) |
 | `--use-dlp-subs` | — | Use YouTube's built-in subtitles to speed up process (skips Whisper if found) |

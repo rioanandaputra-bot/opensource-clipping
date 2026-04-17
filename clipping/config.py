@@ -232,6 +232,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=SWITCH_HOLD_DURATION,
         help="Minimum seconds to hold on the current speaker before switching cameras (camera-switch mode only)",
     )
+    p.add_argument(
+        "--no-subs",
+        action="store_true",
+        help="Disable all subtitle rendering (useful if you only want the video without text)",
+    )
 
     # --- Subtitle & Tipografi ---
     p.add_argument(
@@ -347,6 +352,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         diarization_num_speakers=args.diarization_speakers,
         switch_hold_duration=args.switch_hold_duration,
         # Subtitle & Tipografi
+        no_subs=args.no_subs,
         gaya_font_aktif=args.font_style,
         daftar_font=DAFTAR_FONT,
         use_advanced_text=args.advanced_text,

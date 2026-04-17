@@ -2378,22 +2378,25 @@ def proses_klip(
                     label=f"Rank {rank} Hook",
                 )
 
-            aktif_advanced_hook = cfg.use_advanced_text_on_hook
-            buat_file_ass(
-                data_segmen,
-                h_start,
-                h_end,
-                a_hook,
-                rasio,
-                cfg,
-                typography_plan=typography_plan,
-                gunakan_advanced=aktif_advanced_hook,
-            )
+            if not cfg.no_subs:
+                buat_file_ass(
+                    data_segmen,
+                    h_start,
+                    h_end,
+                    a_hook,
+                    rasio,
+                    cfg,
+                    typography_plan=typography_plan,
+                    gunakan_advanced=aktif_advanced_hook,
+                )
 
-            print("   🎬 [Hook] FFmpeg burn subtitle + audio...")
-            esc_ass_hook = escape_ffmpeg_filter_value(os.path.abspath(a_hook))
-            esc_fontsdir = escape_ffmpeg_filter_value(os.path.abspath(cfg.font_dir))
-            vf_hook = f"subtitles={esc_ass_hook}:fontsdir={esc_fontsdir}"
+                print("   🎬 [Hook] FFmpeg burn subtitle + audio...")
+                esc_ass_hook = escape_ffmpeg_filter_value(os.path.abspath(a_hook))
+                esc_fontsdir = escape_ffmpeg_filter_value(os.path.abspath(cfg.font_dir))
+                vf_hook = f"subtitles={esc_ass_hook}:fontsdir={esc_fontsdir}"
+            else:
+                print("   🎬 [Hook] Skip subtitle rendering...")
+                vf_hook = None
 
             cmd_h_base = [
                 "ffmpeg",
@@ -2413,9 +2416,10 @@ def proses_klip(
                 "0:v:0",
                 "-map",
                 "1:a:0",
-                "-vf",
-                vf_hook,
-            ] + std_p
+            ]
+            if vf_hook:
+                cmd_h_base += ["-vf", vf_hook]
+            cmd_h_base += std_p
 
             cmd_h = build_ffmpeg_progress_cmd(cmd_h_base, h_ts)
             rc_h, err_h = run_ffmpeg_with_progress(
@@ -2460,19 +2464,20 @@ def proses_klip(
                 label=f"Rank {rank} Main",
             )
 
-        buat_file_ass(
-            data_segmen,
-            m_start,
-            m_end,
-            a_main,
-            rasio,
-            cfg,
-            typography_plan=typography_plan,
-            gunakan_advanced=True,
-        )
+        if not cfg.no_subs:
+            buat_file_ass(
+                data_segmen,
+                m_start,
+                m_end,
+                a_main,
+                rasio,
+                cfg,
+                typography_plan=typography_plan,
+                gunakan_advanced=True,
+            )
 
-        print("   🎬 [Main] FFmpeg burn subtitle + audio ducking...")
-        esc_ass_main = escape_ffmpeg_filter_value(os.path.abspath(a_main))
+        print(f"   🎬 [Main] FFmpeg {'skip subtitle' if cfg.no_subs else 'burn subtitle'} + audio ducking...")
+        esc_ass_main = escape_ffmpeg_filter_value(os.path.abspath(a_main)) if not cfg.no_subs else ""
         esc_fontsdir = escape_ffmpeg_filter_value(os.path.abspath(cfg.font_dir))
 
         # SMART BGM
@@ -2501,8 +2506,9 @@ def proses_klip(
                 print("   ⚠️ Semua fallback gagal. Render lanjut tanpa BGM.")
 
         if aktif_bgm and os.path.exists(file_bgm):
+            v_filter = f"subtitles={esc_ass_main}:fontsdir={esc_fontsdir}" if not cfg.no_subs else "null"
             filter_complex = (
-                f"[0:v]subtitles={esc_ass_main}:fontsdir={esc_fontsdir}[v_out]; "
+                f"[0:v]{v_filter}[v_out]; "
                 f"[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.2[voc]; "
                 f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={cfg.bgm_base_volume}[bgm]; "
                 f"[bgm][voc]sidechaincompress=threshold=0.08:ratio=5.0:attack=100:release=1000[bgm_ducked]; "
@@ -2536,7 +2542,6 @@ def proses_klip(
                 "-shortest",
             ] + std_p
         else:
-            vf_main = f"subtitles={esc_ass_main}:fontsdir={esc_fontsdir}"
             cmd_m_base = [
                 "ffmpeg",
                 "-hide_banner",
@@ -2555,9 +2560,11 @@ def proses_klip(
                 "0:v:0",
                 "-map",
                 "1:a:0",
-                "-vf",
-                vf_main,
-            ] + std_p
+            ]
+            if not cfg.no_subs:
+                vf_main = f"subtitles={esc_ass_main}:fontsdir={esc_fontsdir}"
+                cmd_m_base += ["-vf", vf_main]
+            cmd_m_base += std_p
 
         cmd_m = build_ffmpeg_progress_cmd(cmd_m_base, m_ts)
         rc_m, err_m = run_ffmpeg_with_progress(
