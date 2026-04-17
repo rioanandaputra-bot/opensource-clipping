@@ -96,10 +96,25 @@ def run_pipeline(cfg) -> list[dict]:
             print(f"\n🎙️ [{mode_label}] Menjalankan speaker diarization...")
             audio_path = cfg.file_video_asli.replace(".mp4", "_audio.wav")
             diarization_mod.extract_audio(cfg.file_video_asli, audio_path)
+            num_speakers_arg = getattr(cfg, "diarization_num_speakers", 2)
+            min_spk = None
+            max_spk = None
+
+            if str(num_speakers_arg).lower() == "auto":
+                max_faces = studio.estimate_speaker_count_from_video(
+                    cfg.file_video_asli, cfg
+                )
+                num_speakers_arg = "auto"
+                min_spk = max(1, max_faces)
+                max_spk = min_spk + 2
+                print(f"   ℹ️ Instruksi Pyannote: {min_spk} hingga {max_spk} speaker.")
+
             diarization_data = diarization_mod.run_diarization(
                 audio_path,
                 hf_token=cfg.hf_token,
-                num_speakers=getattr(cfg, "diarization_num_speakers", 2),
+                num_speakers=num_speakers_arg,
+                min_speakers=min_spk,
+                max_speakers=max_spk,
             )
             # Clean up temp audio
             if os.path.exists(audio_path):

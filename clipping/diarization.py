@@ -66,7 +66,9 @@ def extract_audio(video_path: str, audio_output_path: str) -> str:
 def run_diarization(
     audio_path: str,
     hf_token: str,
-    num_speakers: int = 2,
+    num_speakers: int | str = 2,
+    min_speakers: int | None = None,
+    max_speakers: int | None = None,
 ) -> list[dict]:
     """
     Run speaker diarization using Pyannote.
@@ -77,8 +79,12 @@ def run_diarization(
         Path to WAV audio file.
     hf_token : str
         HuggingFace token (required for pyannote model access).
-    num_speakers : int
-        Expected number of speakers.
+    num_speakers : int | str
+        Expected number of speakers, or 'auto' to use min_speakers & max_speakers range.
+    min_speakers : int, optional
+        Minimum number of speakers (used if num_speakers is 'auto').
+    max_speakers : int, optional
+        Maximum number of speakers (used if num_speakers is 'auto').
 
     Returns
     -------
@@ -128,7 +134,16 @@ def run_diarization(
         print("   ℹ️ Pyannote menggunakan CPU")
 
     print("🎙️ Menjalankan speaker diarization...")
-    diarization = pipeline(audio_path, num_speakers=num_speakers)
+    if str(num_speakers).lower() == "auto":
+        # Gunakan min_speakers dan max_speakers jika tersedia
+        kwargs = {}
+        if min_speakers is not None:
+            kwargs["min_speakers"] = min_speakers
+        if max_speakers is not None:
+            kwargs["max_speakers"] = max_speakers
+        diarization = pipeline(audio_path, **kwargs)
+    else:
+        diarization = pipeline(audio_path, num_speakers=int(num_speakers))
 
     # Recent pyannote (3.1+) returns a DiarizeOutput dataclass or similar
     if not hasattr(diarization, "itertracks"):

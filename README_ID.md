@@ -162,7 +162,7 @@ python main.py --help
 | `--gemini-model` | `gemini-3-flash-preview` | Nama model Gemini |
 | `--gemini-fallback-model` | `gemini-2.5-flash` | Nama model fallback Gemini jika model utama gagal |
 | `--split-screen` | `False` | Aktifkan mode split-screen untuk podcast (hanya 9:16, butuh `HF_TOKEN`). Mendukung 3+ speaker lintas scene |
-| `--diarization-speakers` | `2` | Jumlah speaker untuk diarization (set ke `3` untuk podcast multi-speaker multi-scene) |
+| `--diarization-speakers` | `auto` | Jumlah speaker untuk diarization (set ke `3` untuk fix 3 orang, atau `auto` untuk deteksi visual AI otomatis) |
 | `--camera-switch` | `False` | Aktifkan mode camera-switch untuk podcast — crop full 9:16 berpindah ke speaker aktif; blurred pillarbox saat kedua speaker bicara bersamaan (hanya 9:16, butuh `HF_TOKEN`) |
 | `--switch-hold-duration` | `2.0` | Durasi minimum (detik) sebelum berpindah speaker (hanya untuk camera-switch) |
 
@@ -283,7 +283,7 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 
 **🎙️ Pengaturan Split-Screen (Podcast)**
 - `--split-screen` : Aktifkan mode split-screen atas-bawah untuk video podcast. Mendukung **3+ speaker lintas scene**. Menggunakan **Pyannote** untuk mendeteksi siapa yang berbicara.
-- `--diarization-speakers` : Jumlah speaker yang diharapkan (default: 2, set ke `3` untuk podcast 3 orang). Memerlukan `HF_TOKEN` di file `.env`.
+- `--diarization-speakers` : Jumlah speaker yang diharapkan (default: `auto`). Mode `auto` akan melakukan visual scanning otomatis untuk menghitung jumlah wajah terbanyak di satu frame untuk mencegah *over-segmentation*. Memerlukan `HF_TOKEN` di file `.env`.
 
 > ⚠️ **Catatan**: Untuk menggunakan split-screen, Anda perlu:
 > 1. Mendaftarkan akun di [HuggingFace](https://huggingface.co/) dan membuat token

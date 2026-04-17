@@ -162,7 +162,7 @@ python main.py --help
 | `--gemini-model` | `gemini-3-flash-preview` | Gemini model name |
 | `--gemini-fallback-model` | `gemini-2.5-flash` | Gemini fallback model name if main model fails |
 | `--split-screen` | `False` | Enable split-screen mode for podcasts (9:16 only, requires `HF_TOKEN`). Supports 3+ speakers across multiple scenes |
-| `--diarization-speakers` | `2` | Number of speakers for diarization (set to `3` for multi-speaker multi-scene podcasts) |
+| `--diarization-speakers` | `auto` | Number of speakers for diarization (set to `3` for exact 3 speakers, or `auto` for visual AI auto-detection) |
 | `--camera-switch` | `False` | Enable camera-switch mode for podcasts — full 9:16 crop switches to the active speaker; blurred pillarbox on simultaneous speech (9:16 only, requires `HF_TOKEN`) |
 | `--switch-hold-duration` | `2.0` | Min seconds to hold on current speaker before switching (camera-switch only) |
 

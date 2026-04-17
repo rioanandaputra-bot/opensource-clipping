@@ -13,7 +13,7 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Multi-Speaker Multi-Scene Podcast Support**: Both `--split-screen` and `--camera-switch` now handle podcast formats with **3+ speakers across multiple scenes** (e.g., 2 speakers in one camera shot + 1 speaker in a separate solo shot). Use `--diarization-speakers 3` to enable.
   - **Split-Screen**: Per-speaker frozen frame cache — each speaker now has their own fallback crop instead of a single shared one. Both panels (top & bottom) can independently fall back to their speaker's last valid frame when the speaker is not visible in the current scene.
   - **Camera-Switch**: Scene-aware simultaneous speech — when 2+ speakers talk simultaneously but are in **different scenes** (one is solo-scene type), the system stays on the current speaker instead of switching to blurred pillarbox. Wide-shot only triggers when all active speakers share the same physical frame.
-  - **Camera-Switch**: Added `speaker_is_solo` tracking to distinguish solo-scene speakers (appear alone in their shot) from multi-scene speakers (share a frame with others).
+  - **Hybrid Visual Auto-Detection**: Added the `auto` option (which is now the default) for `--diarization-speakers`. When set to `auto`, the system performs a rapid visual scan of 20 sampled frames to find the maximum number of people physically appearing together. This number is then injected dynamically into Pyannote as a boundary guide, optimizing accuracy and significantly reducing "over-segmentation" issues.
   - **Split-Screen**: Refactored panel rendering into a reusable `_build_panel()` helper; both panels now use identical fallback logic.
 
 ### Notes

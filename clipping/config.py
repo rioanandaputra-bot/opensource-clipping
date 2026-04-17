@@ -33,7 +33,7 @@ USE_BROLL = True
 USE_HOOK_GLITCH = True
 USE_SPLIT_SCREEN = False
 USE_CAMERA_SWITCH = False
-DIARIZATION_NUM_SPEAKERS = 2
+DIARIZATION_NUM_SPEAKERS = "auto"
 SWITCH_HOLD_DURATION = 2.0
 
 # 3. PENGATURAN SUBTITLE & TIPOGRAFI (ASS STYLE)
@@ -153,6 +153,14 @@ GEMINI_FALLBACK_MODEL = "gemini-2.5-flash"
 # ==============================================================================
 
 
+def _parse_speakers(val: str) -> str | int:
+    if val.lower() == "auto":
+        return "auto"
+    try:
+        return int(val)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{val}' is not a valid integer or 'auto'")
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="🎬 OpenSource Clipping — AI Auto-Clipper & Teaser Generator",
@@ -207,9 +215,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--diarization-speakers",
-        type=int,
+        type=_parse_speakers,
         default=DIARIZATION_NUM_SPEAKERS,
-        help="Number of speakers for diarization (used with --split-screen)",
+        help="Number of speakers for diarization, or 'auto' to auto-detect visually (used with --split-screen or --camera-switch)",
     )
     p.add_argument(
         "--camera-switch",
