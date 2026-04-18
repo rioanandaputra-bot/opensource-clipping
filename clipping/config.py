@@ -303,6 +303,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Draw a yellow bounding box around the detected face for debugging/tracking visualization",
     )
+    p.add_argument(
+        "--dev-mode",
+        action="store_true",
+        help="Enable developer visualization mode for 9:16 tracking (shows stabilization box and dimmed background)",
+    )
 
     # --- Smart Auto-Framing / Tracking ---
     p.add_argument(
@@ -426,6 +431,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         track_jitter=args.track_jitter,
         track_snap=args.track_snap,
         box_face_detection=args.box_face_detection,
+        dev_mode=args.dev_mode,
     )
 
     return cfg

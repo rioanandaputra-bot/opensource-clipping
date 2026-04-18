@@ -910,6 +910,12 @@ def buat_video_hybrid(
 
     # FASE 3: RENDER FRAME
     out_w, out_h = (1080, 1920) if rasio == "9:16" else (1920, 1080)
+    
+    # DEV MODE: Force 16:9 to show context
+    dev_visualize = cfg.dev_mode and rasio == "9:16"
+    if dev_visualize:
+        out_w, out_h = (1920, 1080)
+
     writer = open_ffmpeg_video_writer(
         output_video, out_w, out_h, orig_fps, video_encoder
     )
@@ -935,25 +941,47 @@ def buat_video_hybrid(
 
             waktu_absolut = start_clip + t
 
-            if cfg.box_face_detection:
-                box = get_box(t)
-                if box:
-                    cv2.rectangle(
-                        frame_utama,
-                        (int(box[0]), int(box[1])),
-                        (int(box[2]), int(box[3])),
-                        (0, 255, 255),  # Yellow BGR
-                        3,
-                    )
+            if dev_visualize:
+                # Render full context for dev mode
+                cx = get_x(t)
+                # Resize original to 16:9 canvas
+                frame_base = cv2.resize(frame_utama, (out_w, out_h))
+                
+                # Dim background
+                frame_dev = (frame_base * 0.35).astype(np.uint8)
+                
+                # Highlight 9:16 window
+                # Current source width/height vs canvas out_w/out_h
+                scale_x = out_w / width
+                cx_scaled = int(cx * scale_x)
+                cw_scaled = int(crop_w * scale_x)
+                
+                # Paste bright crop
+                frame_dev[:, cx_scaled : cx_scaled + cw_scaled] = frame_base[:, cx_scaled : cx_scaled + cw_scaled]
+                
+                # Draw vertical border lines
+                cv2.line(frame_dev, (cx_scaled, 0), (cx_scaled, out_h), (255, 255, 255), 2)
+                cv2.line(frame_dev, (cx_scaled + cw_scaled, 0), (cx_scaled + cw_scaled, out_h), (255, 255, 255), 2)
+                
+                # Draw face box if detected
+                if cfg.box_face_detection or True: # Force in dev mode
+                    box = get_box(t)
+                    if box:
+                        scale_y = out_h / height
+                        bx1, by1 = int(box[0] * scale_x), int(box[1] * scale_y)
+                        bx2, by2 = int(box[2] * scale_x), int(box[3] * scale_y)
+                        cv2.rectangle(frame_dev, (bx1, by1), (bx2, by2), (0, 255, 255), 2)
+                
+                frame_terpilih = frame_dev
 
-            if rasio == "9:16":
+            elif rasio == "9:16":
                 cx = get_x(t)
                 cropped = frame_utama[:, cx : cx + crop_w]
                 frame_utama_siap = cv2.resize(cropped, (out_w, out_h))
+                frame_terpilih = frame_utama_siap
             else:
                 frame_utama_siap = cv2.resize(frame_utama, (out_w, out_h))
-
-            frame_terpilih = frame_utama_siap
+                frame_terpilih = frame_utama_siap
 
             for bc in broll_caps:
                 if bc["start"] <= waktu_absolut <= bc["end"]:
@@ -2291,9 +2319,13 @@ def buat_video_camera_switch(
                 return res
         return []
 
-    # ================================================================
-    # FASE 3 — Render frames with camera-switch logic
-    # ================================================================
+    # FASE 3: RENDER FRAME
+    out_w, out_h = (1080, 1920) # Assume 9:16 target
+    
+    dev_visualize = cfg.dev_mode # Assume only for 9:16 as described
+    if dev_visualize:
+        out_w, out_h = (1920, 1080)
+
     writer = open_ffmpeg_video_writer(
         output_video, out_w, out_h, orig_fps, video_encoder
     )
@@ -2331,21 +2363,59 @@ def buat_video_camera_switch(
             timestamp_abs = start_clip + t
             active_speakers = get_active_speakers(diarization_data, timestamp_abs)
 
-            if len(active_speakers) >= 2:
-                # Scene-aware simultaneous speech:
-                # Only use blurred pillarbox (wide-shot) if ALL active speakers
-                # are multi-scene type (i.e. they share the same physical frame).
-                # If any active speaker is solo-scene type, they're in a different
-                # scene entirely — stay on the current speaker instead of wide-shot.
+            if dev_visualize:
+                # Dev visualization for camera-switch
+                frame_base = cv2.resize(frame, (out_w, out_h))
+                frame_dev = (frame_base * 0.35).astype(np.uint8)
+                
+                scale_x = out_w / width
+                
+                # Check what state we are in (Wide or Crop)
+                is_wide = False
+                if len(active_speakers) >= 2:
+                    all_multi_scene = all(not speaker_is_solo.get(spk, False) for spk in active_speakers)
+                    if all_multi_scene:
+                        is_wide = True
+                elif len(active_speakers) == 0 and current_speaker is None:
+                    is_wide = True
+                
+                if is_wide:
+                    # Show full frame in dev mode (maybe slightly brightened back or with label)
+                    frame_dev = (frame_base * 0.8).astype(np.uint8)
+                    cv2.putText(frame_dev, "WIDE SHOT", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                else:
+                    # It's a crop on current_speaker
+                    if current_speaker is not None:
+                        cx = _get_x(current_speaker, t)
+                        cx_scaled = int(cx * scale_x)
+                        cw_scaled = int(crop_w * scale_x)
+                        
+                        # Paste bright crop
+                        frame_dev[:, cx_scaled : cx_scaled + cw_scaled] = frame_base[:, cx_scaled : cx_scaled + cw_scaled]
+                        # Vertical lines
+                        cv2.line(frame_dev, (cx_scaled, 0), (cx_scaled, out_h), (255, 255, 255), 2)
+                        cv2.line(frame_dev, (cx_scaled + cw_scaled, 0), (cx_scaled + cw_scaled, out_h), (255, 255, 255), 2)
+                        
+                        label_spk = f"TRACKING: {current_speaker}"
+                        cv2.putText(frame_dev, label_spk, (cx_scaled + 10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+                # Force face boxes in dev mode
+                f_boxes = _get_all_boxes(t)
+                for fb in f_boxes:
+                    scale_y = out_h / height
+                    fb1, fb2, fb3, fb4 = int(fb[0]*scale_x), int(fb[1]*scale_y), int(fb[2]*scale_x), int(fb[3]*scale_y)
+                    cv2.rectangle(frame_dev, (fb1, fb2), (fb3, fb4), (0, 255, 255), 2)
+                
+                out_frame = frame_dev
+
+            elif len(active_speakers) >= 2:
+                # ... standard logic ...
                 all_multi_scene = all(
                     not speaker_is_solo.get(spk, False) for spk in active_speakers
                 )
                 if all_multi_scene:
-                    # All speakers are in the same scene → blurred pillarbox wide-shot
                     out_frame = _make_blurred_pillarbox(frame)
                 else:
-                    # Mixed scenes: at least one speaker is solo-scene type.
-                    # Stay on current speaker, or pick the first active speaker.
                     if current_speaker is None or current_speaker not in active_speakers:
                         current_speaker = active_speakers[0]
                         last_switch_time = t
@@ -2355,7 +2425,6 @@ def buat_video_camera_switch(
 
             elif len(active_speakers) == 1:
                 new_speaker = active_speakers[0]
-                # Switch logic: enforce minimum hold duration
                 if current_speaker is None:
                     current_speaker = new_speaker
                     last_switch_time = t
@@ -2365,13 +2434,11 @@ def buat_video_camera_switch(
                 ):
                     current_speaker = new_speaker
                     last_switch_time = t
-                # else: hold not expired → stay on current_speaker
                 cx = _get_x(current_speaker, t)
                 crop_fr = frame[0:crop_h, cx : cx + crop_w]
                 out_frame = cv2.resize(crop_fr, (out_w, out_h))
 
             else:
-                # No active speaker → stay on last known speaker, or wide-shot
                 if current_speaker is not None:
                     cx = _get_x(current_speaker, t)
                     crop_fr = frame[0:crop_h, cx : cx + crop_w]

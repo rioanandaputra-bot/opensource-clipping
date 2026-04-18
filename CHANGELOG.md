@@ -7,6 +7,15 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.7.7] - 2026-04-18
+
+> ⚠️ **Experimental**: The dev-mode stabilizer visualization is currently experimental.
+
+### Added
+- **Developer Visualization Mode** (`--dev-mode`): New flag for 9:16 target ratio that renders a 16:9 context view. It visualizes the "Director's view" of the stabilization process by dimming the background outside the 9:16 crop, drawing boundary lines, and labeling tracking targets. Useful for fine-tuning AI tracking speed and deadzones.
+
+---
+
 ## [v0.7.6] - 2026-04-18
 
 ### Added

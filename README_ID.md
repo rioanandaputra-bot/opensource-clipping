@@ -158,6 +158,7 @@ python main.py --help
 | `--use-dlp-subs` | — | Unduh dan gunakan subtitle bawaan YouTube untuk mempercepat proses (melewati Whisper) |
 | `--face-detector` | `mediapipe` | Model AI untuk crop wajah (`mediapipe` atau `yolo`) |
 | `--box-face-detection` | `False` | Tampilkan kotak kuning deteksi wajah (debug) |
+| `--dev-mode` | `False` | **[Eksperimental]** Aktifkan visualisasi konteks 16:9 untuk proses tracking/stabilisasi 9:16 |
 | `--yolo-size` | `8m` | Parameter model YOLO ADetailer (`8n`, `8s`, `8m`, `8n_v2`, `9c`) |
 | `--whisper-model` | `large-v3` | Ukuran model Whisper ([lihat daftar model](https://github.com/SYSTRAN/faster-whisper?tab=readme-ov-file#whisper)) |
 | `--whisper-device` | `cuda` | Device Whisper (`cuda`, `cpu`, `auto`) |
@@ -310,6 +311,7 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 - `--track-smooth` : Faktor kecepatan kamera mengejar wajah (default: `0.30`). Makin besar makin cepat menyusul.
 - `--track-jitter` : Ambang batas pixel untuk mengabaikan getaran kecil (default: `5`).
 - `--track-snap` : Ambang batas lompatan wajah untuk memicu hard cut antar pembicara (default: `0.25`).
+- `--dev-mode` : **[Eksperimental]** Aktifkan mode visualisasi "Director" untuk rasio 9:16. Menampilkan context 16:9 penuh dengan background yang digelapkan, garis batas window, dan label tracking. Sangat berguna untuk kalibrasi kecepatan dan responsivitas AI tracking.
 
 > 💡 **Skenario rendering Camera Switch:**
 > - **Satu speaker aktif** → crop full 9:16 mengikuti wajah speaker tersebut
