@@ -2542,7 +2542,8 @@ def proses_klip(
                     cfg,
                     label=f"Rank {rank} Hook",
                 )
-
+            
+            aktif_advanced_hook = cfg.use_advanced_text_on_hook
             if not cfg.no_subs:
                 buat_file_ass(
                     data_segmen,
