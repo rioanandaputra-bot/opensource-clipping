@@ -279,7 +279,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Compute type for Whisper (float16, int8, etc.)",
     )
 
-    # --- Gemini ---
+    # --- Gemini & Face Detection ---
     p.add_argument(
         "--face-detector",
         choices=["mediapipe", "yolo"],
@@ -297,6 +297,38 @@ def _build_parser() -> argparse.ArgumentParser:
         "--gemini-fallback-model",
         default=GEMINI_FALLBACK_MODEL,
         help="Gemini fallback model name if main model fails",
+    )
+
+    # --- Smart Auto-Framing / Tracking ---
+    p.add_argument(
+        "--track-step",
+        type=float,
+        default=None,
+        help="Face detection frequency in seconds (default: 0.25)",
+    )
+    p.add_argument(
+        "--track-deadzone",
+        type=float,
+        default=None,
+        help="Camera deadzone ratio (default: 0.15)",
+    )
+    p.add_argument(
+        "--track-smooth",
+        type=float,
+        default=None,
+        help="Camera smoothing factor (default: 0.30)",
+    )
+    p.add_argument(
+        "--track-jitter",
+        type=int,
+        default=None,
+        help="Micro-jitter pixel threshold (default: 5)",
+    )
+    p.add_argument(
+        "--track-snap",
+        type=float,
+        default=None,
+        help="Speaker switch snap ratio threshold (default: 0.25)",
     )
 
     return p
@@ -382,6 +414,12 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         # Gemini
         gemini_model=args.gemini_model,
         gemini_fallback_model=args.gemini_fallback_model,
+        # Tracking Tuning
+        track_step=args.track_step,
+        track_deadzone=args.track_deadzone,
+        track_smooth=args.track_smooth,
+        track_jitter=args.track_jitter,
+        track_snap=args.track_snap,
     )
 
     return cfg

@@ -7,6 +7,18 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.7.5] - 2026-04-18
+
+### Added
+- **Configurable Tracking Parameters**: Exposed internal camera tracking constants as CLI flags. If not provided, the system defaults to the optimized values introduced in v0.7.4.
+  - `--track-step`: Face detection frequency in seconds.
+  - `--track-deadzone`: Camera deadzone ratio.
+  - `--track-smooth`: Camera smoothing/catch-up factor.
+  - `--track-jitter`: Micro-jitter pixel threshold.
+  - `--track-snap`: Jump threshold for hard cuts between speakers.
+
+---
+
 ## [v0.7.4] - 2026-04-18
 
 ### Improved

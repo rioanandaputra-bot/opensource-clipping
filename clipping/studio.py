@@ -719,22 +719,22 @@ def buat_video_hybrid(
     # =======================================================
     # 🎛️ PARAMETER TUNING KAMERA
     # =======================================================
-    STEP_DETEKSI     = 0.25   # AI mengecek wajah tiap 0.25 detik
+    STEP_DETEKSI     = cfg.track_step if cfg.track_step is not None else 0.25   # AI mengecek wajah tiap 0.25 detik
     # STEP_DETEKSI     = 0.5   # AI mengecek wajah tiap 0.5 detik
     # STEP_DETEKSI     = max(0.5, (end_clip - start_clip) / 60.0)   # [OLD] AI mengecek wajah tiap max 0.5 atau sepanjang durasi (end_clip - start_clip) detik per menit
 
-    DEADZONE_RATIO   = 0.15  # 15% area tengah adalah zona aman (kamera tidak ikut gerak)
+    DEADZONE_RATIO   = cfg.track_deadzone if cfg.track_deadzone is not None else 0.15  # 15% area tengah adalah zona aman (kamera tidak ikut gerak)
     # DEADZONE_RATIO   = 0.25  # 25% area tengah adalah zona aman (kamera tidak ikut gerak)
     # DEADZONE_RATIO   = 0.20  # [OLD] 20% area tengah adalah zona aman (kamera tidak ikut gerak)
 
-    SMOOTH_FACTOR    = 0.30  # Kecepatan kamera menyusul (30% jarak). Bikin pergerakan sangat mulus.
+    SMOOTH_FACTOR    = cfg.track_smooth if cfg.track_smooth is not None else 0.30  # Kecepatan kamera menyusul (30% jarak). Bikin pergerakan sangat mulus.
     # SMOOTH_FACTOR    = 0.15  # Kecepatan kamera menyusul (15% jarak). Bikin pergerakan sangat mulus.
     # SMOOTH_FACTOR    = 0.10  # [NEW; NOT USED]Kecepatan kamera menyusul (10% jarak). Bikin pergerakan sangat mulus.
 
-    JITTER_THRESHOLD = 5     # Abaikan pergeseran di bawah 5 pixel (Anti-getar/Micro-jitter)
+    JITTER_THRESHOLD = cfg.track_jitter if cfg.track_jitter is not None else 5     # Abaikan pergeseran di bawah 5 pixel (Anti-getar/Micro-jitter)
     # JITTER_THRESHOLD = 4     # [OLD] Abaikan pergeseran di bawah 4 pixel (Anti-getar/Micro-jitter)
 
-    SNAP_THRESHOLD   = 0.25  # Jika wajah lompat > 25% lebar layar, anggap ganti orang (Hard Cut)
+    SNAP_THRESHOLD   = cfg.track_snap if cfg.track_snap is not None else 0.25  # Jika wajah lompat > 25% lebar layar, anggap ganti orang (Hard Cut)
     # SNAP_THRESHOLD   = 0.30  # [NEW; NOT USED] Jika wajah lompat > 30% lebar layar, anggap ganti orang (Hard Cut)
     # =======================================================
 

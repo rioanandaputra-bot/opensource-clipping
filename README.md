@@ -166,6 +166,11 @@ python main.py --help
 | `--diarization-speakers` | `auto` | Number of speakers for diarization (set to `3` for exact 3 speakers, or `auto` for visual AI auto-detection) |
 | `--camera-switch` | `False` | Enable camera-switch mode for podcasts — full 9:16 crop switches to the active speaker; blurred pillarbox on simultaneous speech (9:16 only, requires `HF_TOKEN`) |
 | `--switch-hold-duration` | `2.0` | Min seconds to hold on current speaker before switching (camera-switch only) |
+| `--track-step` | `None` | Face detection frequency in seconds (default: `0.25`) |
+| `--track-deadzone` | `None` | Camera deadzone ratio where subject stays centered (default: `0.15`) |
+| `--track-smooth` | `None` | Camera catch-up speed factor (default: `0.30`) |
+| `--track-jitter` | `None` | Pixel threshold to ignore micro-shakes (default: `5`) |
+| `--track-snap` | `None` | Jump threshold to trigger hard cut between speakers (default: `0.25`) |
 
 ## 🎙️ Podcast Mode Comparison
 

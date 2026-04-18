@@ -166,6 +166,11 @@ python main.py --help
 | `--diarization-speakers` | `auto` | Jumlah speaker untuk diarization (set ke `3` untuk fix 3 orang, atau `auto` untuk deteksi visual AI otomatis) |
 | `--camera-switch` | `False` | Aktifkan mode camera-switch untuk podcast — crop full 9:16 berpindah ke speaker aktif; blurred pillarbox saat kedua speaker bicara bersamaan (hanya 9:16, butuh `HF_TOKEN`) |
 | `--switch-hold-duration` | `2.0` | Durasi minimum (detik) sebelum berpindah speaker (hanya untuk camera-switch) |
+| `--track-step` | `None` | Frekuensi pengecekan wajah dalam detik (default: `0.25`) |
+| `--track-deadzone` | `None` | Rasio area "aman" di mana kamera tidak bergerak (default: `0.15`) |
+| `--track-smooth` | `None` | Faktor kecepatan kamera mengejar wajah (default: `0.30`) |
+| `--track-jitter` | `None` | Ambang batas pixel untuk anti-getar (default: `5`) |
+| `--track-snap` | `None` | Ambang batas lompatan wajah untuk hard cut (default: `0.25`) |
 
 ## 🎙️ Perbedaan Mode Podcast
 
@@ -295,6 +300,13 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 **📹 Pengaturan Camera Switch (Podcast)**
 - `--camera-switch` : Aktifkan mode camera-switch penuh — video 9:16 bergantian mengikuti speaker yang aktif. **Scene-aware**: blurred pillarbox hanya muncul saat speaker di scene yang sama bicara bersamaan; jika speaker dari scene berbeda, tetap fokus ke speaker saat ini. **Mutually exclusive** dengan `--split-screen` (split-screen lebih prioritas jika keduanya diaktifkan).
 - `--switch-hold-duration` : Durasi minimum (detik) sebelum sistem berpindah speaker (default: `2.0`). Berguna agar tidak flickering saat pergantian cepat.
+
+**🔭 Pengaturan Tracking & Kamera (Auto-Framing)**
+- `--track-step` : Frekuensi pengecekan wajah dalam detik (default: `0.25`). Makin kecil makin responsif tapi makin berat.
+- `--track-deadzone` : Rasio area "aman" di tengah di mana kamera tidak akan bergerak (default: `0.15`).
+- `--track-smooth` : Faktor kecepatan kamera mengejar wajah (default: `0.30`). Makin besar makin cepat menyusul.
+- `--track-jitter` : Ambang batas pixel untuk mengabaikan getaran kecil (default: `5`).
+- `--track-snap` : Ambang batas lompatan wajah untuk memicu hard cut antar pembicara (default: `0.25`).
 
 > 💡 **Skenario rendering Camera Switch:**
 > - **Satu speaker aktif** → crop full 9:16 mengikuti wajah speaker tersebut
