@@ -7,6 +7,13 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.7.6] - 2026-04-18
+
+### Added
+- **Face Detection Visualization**: Introduced the `--box-face-detection` CLI flag. This draws a yellow bounding box around every detected face in the source frame, with smooth linear interpolation between detection intervals. Useful for debugging face tracking accuracy.
+
+---
+
 ## [v0.7.5] - 2026-04-18
 
 ### Added

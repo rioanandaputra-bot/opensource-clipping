@@ -790,6 +790,7 @@ def buat_video_hybrid(
             break
 
         best_x = default_x
+        face_box = None
 
         if cfg.face_detector == "yolo":
             yolo_results = yolo_model(frame, verbose=False)
@@ -800,6 +801,7 @@ def buat_video_hybrid(
                 x1, y1, x2, y2 = boxes[largest_idx]
                 center_x = x1 + (x2 - x1) / 2
                 best_x = center_x - (crop_w / 2)
+                face_box = (x1, y1, x2, y2)
         else:
             results = detector.detect(
                 mp.Image(
@@ -816,9 +818,19 @@ def buat_video_hybrid(
                 best_x = (largest_face.origin_x + (largest_face.width / 2)) - (
                     crop_w // 2
                 )
+                face_box = (
+                    largest_face.origin_x,
+                    largest_face.origin_y,
+                    largest_face.origin_x + largest_face.width,
+                    largest_face.origin_y + largest_face.height,
+                )
 
         raw_data.append(
-            {"time": current_time, "x": max(0, min(best_x, width - crop_w))}
+            {
+                "time": current_time,
+                "x": max(0, min(best_x, width - crop_w)),
+                "box": face_box,
+            }
         )
 
         detect_percent = (
@@ -853,6 +865,30 @@ def buat_video_hybrid(
                 final_x = smooth_data[-1]["x"]
 
             smooth_data.append({"time": d["time"], "x": final_x})
+
+    def get_box(t):
+        if not raw_data:
+            return None
+        if t <= raw_data[0]["time"]:
+            return raw_data[0]["box"]
+        if t >= raw_data[-1]["time"]:
+            return raw_data[-1]["box"]
+
+        for i in range(len(raw_data) - 1):
+            if raw_data[i]["time"] <= t <= raw_data[i + 1]["time"]:
+                b1 = raw_data[i]["box"]
+                b2 = raw_data[i + 1]["box"]
+                if b1 is None or b2 is None:
+                    return b1 if b1 else b2
+                t1, t2 = raw_data[i]["time"], raw_data[i + 1]["time"]
+                frac = (t - t1) / (t2 - t1)
+                return (
+                    b1[0] + (b2[0] - b1[0]) * frac,
+                    b1[1] + (b2[1] - b1[1]) * frac,
+                    b1[2] + (b2[2] - b1[2]) * frac,
+                    b1[3] + (b2[3] - b1[3]) * frac,
+                )
+        return None
 
     def get_x(t):
         if not smooth_data:
@@ -898,6 +934,17 @@ def buat_video_hybrid(
                 break
 
             waktu_absolut = start_clip + t
+
+            if cfg.box_face_detection:
+                box = get_box(t)
+                if box:
+                    cv2.rectangle(
+                        frame_utama,
+                        (int(box[0]), int(box[1])),
+                        (int(box[2]), int(box[3])),
+                        (0, 255, 255),  # Yellow BGR
+                        3,
+                    )
 
             if rasio == "9:16":
                 cx = get_x(t)
@@ -1476,7 +1523,7 @@ def buat_video_split_screen(
 
     print(f"🧠 {label} - Analisa wajah (split-screen) dimulai...", flush=True)
 
-    all_frame_data: list[dict] = []  # [{time, face_centers, active_now}]
+    all_frame_data: list[dict] = []  # [{time, face_centers, face_boxes, active_now}]
     speaker_solo_cxs: dict[str, list] = {}  # speaker → [cx, ...] from 1:1 frames
     solo_counts: dict[str, int] = {spk: 0 for spk in all_speakers_in_clip}
     multi_counts: dict[str, int] = {spk: 0 for spk in all_speakers_in_clip}
@@ -1493,6 +1540,7 @@ def buat_video_split_screen(
             break
 
         face_centers = []
+        face_boxes = []
 
         if cfg.face_detector == "yolo":
             yolo_results = yolo_model(frame, verbose=False)
@@ -1503,6 +1551,7 @@ def buat_video_split_screen(
                     cx = (x1 + x2) / 2
                     cy = (y1 + y2) / 2
                     face_centers.append((cx, cy))
+                    face_boxes.append((x1, y1, x2, y2))
         else:
             results = detector.detect(
                 mp.Image(
@@ -1516,6 +1565,14 @@ def buat_video_split_screen(
                     cx = bb.origin_x + bb.width / 2
                     cy = bb.origin_y + bb.height / 2
                     face_centers.append((cx, cy))
+                    face_boxes.append(
+                        (
+                            bb.origin_x,
+                            bb.origin_y,
+                            bb.origin_x + bb.width,
+                            bb.origin_y + bb.height,
+                        )
+                    )
 
         face_centers.sort(key=lambda fc: fc[0])  # left → right
         active_now = get_active_speakers(diarization_data, start_clip + current_time)
@@ -1536,6 +1593,7 @@ def buat_video_split_screen(
             {
                 "time": current_time,
                 "face_centers": face_centers,
+                "face_boxes": face_boxes,
                 "active_now": active_now,
             }
         )
@@ -1674,6 +1732,37 @@ def buat_video_split_screen(
                 return int(x1 + (x2 - x1) * (t - t1) / (t2 - t1))
         return default_x
 
+    def _get_all_boxes(t):
+        if not all_frame_data:
+            return []
+        if t <= all_frame_data[0]["time"]:
+            return all_frame_data[0]["face_boxes"]
+        if t >= all_frame_data[-1]["time"]:
+            return all_frame_data[-1]["face_boxes"]
+
+        for i in range(len(all_frame_data) - 1):
+            if all_frame_data[i]["time"] <= t <= all_frame_data[i + 1]["time"]:
+                b1s = all_frame_data[i]["face_boxes"]
+                b2s = all_frame_data[i + 1]["face_boxes"]
+                
+                # Simple approach: if counts match, interpolate. Else just return nearest.
+                if len(b1s) != len(b2s):
+                    return b1s if abs(t - all_frame_data[i]["time"]) < abs(t - all_frame_data[i+1]["time"]) else b2s
+                
+                t1, t2 = all_frame_data[i]["time"], all_frame_data[i + 1]["time"]
+                frac = (t - t1) / (t2 - t1)
+                
+                res = []
+                for b1, b2 in zip(b1s, b2s):
+                    res.append((
+                        b1[0] + (b2[0] - b1[0]) * frac,
+                        b1[1] + (b2[1] - b1[1]) * frac,
+                        b1[2] + (b2[2] - b1[2]) * frac,
+                        b1[3] + (b2[3] - b1[3]) * frac,
+                    ))
+                return res
+        return []
+
     # ---- FASE 3: RENDER FRAMES ----
     writer = open_ffmpeg_video_writer(
         output_video, out_w, out_h, orig_fps, video_encoder
@@ -1700,6 +1789,17 @@ def buat_video_split_screen(
             t = frame_count / orig_fps
             if t > duration:
                 break
+
+            if cfg.box_face_detection:
+                boxes = _get_all_boxes(t)
+                for b in boxes:
+                    cv2.rectangle(
+                        frame,
+                        (int(b[0]), int(b[1])),
+                        (int(b[2]), int(b[3])),
+                        (0, 255, 255),
+                        3,
+                    )
 
             timestamp_abs = start_clip + t
             active_speaker = get_active_speaker(diarization_data, timestamp_abs)
@@ -1949,6 +2049,7 @@ def buat_video_camera_switch(
             break
 
         face_centers = []
+        face_boxes = []
 
         if cfg.face_detector == "yolo":
             yolo_results = yolo_model(frame, verbose=False)
@@ -1957,6 +2058,7 @@ def buat_video_camera_switch(
                 for box in boxes:
                     x1, y1, x2, y2 = box
                     face_centers.append(((x1 + x2) / 2, (y1 + y2) / 2))
+                    face_boxes.append((x1, y1, x2, y2))
         else:
             results = detector.detect(
                 mp.Image(
@@ -1971,6 +2073,14 @@ def buat_video_camera_switch(
                         (
                             bb.origin_x + bb.width / 2,
                             bb.origin_y + bb.height / 2,
+                        )
+                    )
+                    face_boxes.append(
+                        (
+                            bb.origin_x,
+                            bb.origin_y,
+                            bb.origin_x + bb.width,
+                            bb.origin_y + bb.height,
                         )
                     )
 
@@ -1993,6 +2103,7 @@ def buat_video_camera_switch(
             {
                 "time": current_time,
                 "face_centers": face_centers,
+                "face_boxes": face_boxes,
                 "active_now": active_now,
             }
         )
@@ -2153,6 +2264,33 @@ def buat_video_camera_switch(
         result[y_start : y_start + fg_h, 0:fg_w] = fg
         return result
 
+    def _get_all_boxes(t):
+        if not all_frame_data:
+            return []
+        if t <= all_frame_data[0]["time"]:
+            return all_frame_data[0]["face_boxes"]
+        if t >= all_frame_data[-1]["time"]:
+            return all_frame_data[-1]["face_boxes"]
+
+        for i in range(len(all_frame_data) - 1):
+            if all_frame_data[i]["time"] <= t <= all_frame_data[i + 1]["time"]:
+                b1s = all_frame_data[i]["face_boxes"]
+                b2s = all_frame_data[i + 1]["face_boxes"]
+                if len(b1s) != len(b2s):
+                    return b1s if abs(t - all_frame_data[i]["time"]) < abs(t - all_frame_data[i+1]["time"]) else b2s
+                t1, t2 = all_frame_data[i]["time"], all_frame_data[i + 1]["time"]
+                frac = (t - t1) / (t2 - t1)
+                res = []
+                for b1, b2 in zip(b1s, b2s):
+                    res.append((
+                        b1[0] + (b2[0] - b1[0]) * frac,
+                        b1[1] + (b2[1] - b1[1]) * frac,
+                        b1[2] + (b2[2] - b1[2]) * frac,
+                        b1[3] + (b2[3] - b1[3]) * frac,
+                    ))
+                return res
+        return []
+
     # ================================================================
     # FASE 3 — Render frames with camera-switch logic
     # ================================================================
@@ -2178,6 +2316,17 @@ def buat_video_camera_switch(
             t = frame_count / orig_fps
             if t > duration:
                 break
+
+            if cfg.box_face_detection:
+                boxes = _get_all_boxes(t)
+                for b in boxes:
+                    cv2.rectangle(
+                        frame,
+                        (int(b[0]), int(b[1])),
+                        (int(b[2]), int(b[3])),
+                        (0, 255, 255),
+                        3,
+                    )
 
             timestamp_abs = start_clip + t
             active_speakers = get_active_speakers(diarization_data, timestamp_abs)

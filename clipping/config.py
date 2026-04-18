@@ -298,6 +298,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=GEMINI_FALLBACK_MODEL,
         help="Gemini fallback model name if main model fails",
     )
+    p.add_argument(
+        "--box-face-detection",
+        action="store_true",
+        help="Draw a yellow bounding box around the detected face for debugging/tracking visualization",
+    )
 
     # --- Smart Auto-Framing / Tracking ---
     p.add_argument(
@@ -420,6 +425,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         track_smooth=args.track_smooth,
         track_jitter=args.track_jitter,
         track_snap=args.track_snap,
+        box_face_detection=args.box_face_detection,
     )
 
     return cfg
