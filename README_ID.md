@@ -154,6 +154,7 @@ python main.py --help
 | `--no-subs` | — | Nonaktifkan semua rendering subtitle |
 | `--no-karaoke` | — | Gunakan teks biasa tanpa highlight karaoke |
 | `--advanced-text` | `False` | Aktifkan typografi kinetik (skala kata & animasi pop) |
+| `--advanced-text-hook` | `False` | Aktifkan typografi kinetik khusus untuk hook teaser |
 | `--use-dlp-subs` | — | Unduh dan gunakan subtitle bawaan YouTube untuk mempercepat proses (melewati Whisper) |
 | `--face-detector` | `mediapipe` | Model AI untuk crop wajah (`mediapipe` atau `yolo`) |
 | `--box-face-detection` | `False` | Tampilkan kotak kuning deteksi wajah (debug) |
@@ -285,6 +286,7 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 - `--no-subs` : Matikan semua rendering subtitle (video bersih tanpa teks)
 - `--no-karaoke` : Matikan efek warna kuning per-kata, ganti dengan teks bersih muncul satu per satu
 - `--advanced-text` : Aktifkan efek scaling kata besar-kecil (kinetic typography)
+- `--advanced-text-hook` : Aktifkan efek scaling kata khusus untuk teaser hook di awal video
 
 **⚙️ Pengaturan Engine Pendukung**
 - `--use-dlp-subs` : Aktifkan pengunduhan subtitle bawaan YouTube (jika tersedia) untuk bypass proses AI Whisper (sangat menghemat waktu komputasi).

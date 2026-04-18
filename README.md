@@ -154,6 +154,7 @@ python main.py --help
 | `--no-subs` | — | Disable all subtitle rendering |
 | `--no-karaoke` | — | Use clean text instead of karaoke highlight |
 | `--advanced-text` | `False` | Enable kinetic typography (word scaling & animation) |
+| `--advanced-text-hook` | `False` | Enable kinetic typography specifically on the hook teaser |
 | `--use-dlp-subs` | — | Use YouTube's built-in subtitles to speed up process (skips Whisper if found) |
 | `--face-detector` | `mediapipe` | AI model for face tracking (`mediapipe` or `yolo`) |
 | `--box-face-detection` | `False` | Draw yellow bounding boxes for tracking debug |
