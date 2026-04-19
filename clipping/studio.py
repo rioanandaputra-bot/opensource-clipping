@@ -1535,8 +1535,29 @@ def buat_video_split_screen(
 
     # Output dimensions: 1080x1920 for 9:16
     out_w, out_h = 1080, 1920
+    dev_visualize = cfg.dev_mode
+    if dev_visualize:
+        out_w, out_h = 1920, 1080
+
     panel_h = (out_h - DIVIDER_HEIGHT) // 2  # height per speaker panel
-    panel_w = out_w
+    if dev_visualize: # use fixed scale for dev mode panels to avoid distortion
+        panel_h, panel_w_fixed = 960, 1080 # matches 1080x1920 logical boxes but scaled maybe?
+        # Actually in Dev Mode we just draw rectangles on a 1920x1080 base.
+        # But we still need panel_h/w for internal logic if used.
+        panel_h = (1920 - DIVIDER_HEIGHT) // 2 
+        # Wait, let's keep it simple. out_w/out_h are ONLY for the encoder.
+    
+    panel_h = (1920 - DIVIDER_HEIGHT) // 2 if not dev_visualize else 960
+    panel_w = 1080 if not dev_visualize else 1080
+    # Re-calculate to be safe
+    out_w_final, out_h_final = out_w, out_h
+    if not dev_visualize:
+        panel_h = (1920 - DIVIDER_HEIGHT) // 2
+        panel_w = 1080
+    else:
+        # Internal panel logic should still think in terms of 1080x1920 logic
+        panel_h = (1920 - DIVIDER_HEIGHT) // 2
+        panel_w = 1080
 
     # --- Panel Crop dimensions (wider aspect for half-height panels) ---
     panel_ratio = panel_w / panel_h
@@ -1887,7 +1908,7 @@ def buat_video_split_screen(
 
     # ---- FASE 3: RENDER FRAMES ----
     writer = open_ffmpeg_video_writer(
-        output_video, out_w, out_h, orig_fps, video_encoder
+        output_video, out_w_final, out_h_final, orig_fps, video_encoder
     )
 
     # Pre-create overlay for inactive speaker
@@ -2077,10 +2098,87 @@ def buat_video_split_screen(
 
 
             # Ensure exact output dimensions
-            if final_frame.shape[0] != out_h or final_frame.shape[1] != out_w:
-                final_frame = cv2.resize(final_frame, (out_w, out_h))
+            if not dev_visualize:
+                if final_frame.shape[0] != out_h_final or final_frame.shape[1] != out_w_final:
+                    final_frame = cv2.resize(final_frame, (out_w_final, out_h_final))
+            else:
+                # --- DIRECTOR'S CONSOLE (DEV MODE) ---
+                # UI Constants
+                HUD_COLOR = (0, 255, 0)
+                HUD_BG = (0, 0, 0)
+                HUD_X, HUD_Y = 30, 50
+                
+                # Base frame: 1920x1080 landscape
+                frame_res = cv2.resize(frame, (1920, 1080))
+                frame_dev = (frame_res * 0.35).astype(np.uint8) # Dim background
+                
+                scale_x = 1920 / width
+                scale_y = 1080 / height
+                
+                # Draw all detected faces
+                all_boxes = _get_all_boxes(t)
+                for b in all_boxes:
+                    bx1, by1, bx2, by2 = int(b[0]*scale_x), int(b[1]*scale_y), int(b[2]*scale_x), int(b[3]*scale_y)
+                    cv2.rectangle(frame_dev, (bx1, by1), (bx2, by2), (0, 255, 255), 2)
+                
+                # Draw crop boundaries based on current layout
+                if current_layout == "full":
+                    # Solo 9:16 box in the center of 16:9 frame
+                    # Calculate center area of 16:9 frame
+                    spk = current_speaker or ranked[0]
+                    cx_val = _get_cx(spk, t)
+                    cx_scaled = int(cx_val * scale_x)
+                    cw_scaled = int(crop_w_full * scale_x)
+                    ch_scaled = int(crop_h_full * scale_y) # should be 1080
+                    
+                    x1 = cx_scaled - cw_scaled // 2
+                    x2 = cx_scaled + cw_scaled // 2
+                    cv2.rectangle(frame_dev, (x1, 0), (x2, 1079), (255, 255, 255), 3)
+                    cv2.putText(frame_dev, f"SOLO: {spk}", (x1 + 10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                else:
+                    # Split logic: two boxes
+                    # Panel centers are generally fixed at width/2 in split mode for this implementation
+                    cx_val = width / 2
+                    cx_scaled = int(cx_val * scale_x)
+                    cw_scaled = int(crop_w * scale_x)
+                    ch_scaled = int(crop_h * scale_y)
+                    
+                    x1 = cx_scaled - cw_scaled // 2
+                    x2 = cx_scaled + cw_scaled // 2
+                    
+                    # Split divider in the middle
+                    mid_h = (1080 - DIVIDER_HEIGHT) // 2
+                    cv2.rectangle(frame_dev, (x1, 0), (x2, mid_h), (255, 255, 255), 2)
+                    cv2.rectangle(frame_dev, (x1, mid_h + DIVIDER_HEIGHT), (x2, 1079), (255, 255, 255), 2)
+                    cv2.putText(frame_dev, "SPLIT VIEW", (x1 + 10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-            # Subtitle tracking is already handled inside the layout branches
+                # HUD Info
+                now_count = face_count_history[-1] if face_count_history else 0
+                diff_val = avg_diff if 'avg_diff' in locals() else 0
+                
+                hud_lines = [
+                    f"MODE: DYNAMIC SPLIT (DEV)",
+                    f"TIME: {format_seconds(t)}",
+                    f"LAYOUT: {current_layout.upper()}",
+                    f"FACES (NOW): {now_count} | STABLE: {stable_count}",
+                    f"SCENE DIFF: {diff_val:.1f} (Thr: {SCENE_CUT_THRESHOLD})",
+                ]
+                
+                # Scene cut alert
+                if diff_val > SCENE_CUT_THRESHOLD:
+                    hud_lines[-1] += " >> RESET! <<"
+                
+                # Hold status
+                hold_rem = max(0, MIN_HOLD - (t - last_switch_time))
+                if hold_rem > 0:
+                    hud_lines.append(f"SWITCH HOLD: {hold_rem:.1f}s")
+                else:
+                    hud_lines.append(f"SWITCH HOLD: READY")
+                
+                for i, line in enumerate(hud_lines):
+                    cv2.putText(frame_dev, line, (HUD_X, HUD_Y + i*35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, HUD_COLOR, 2)
+                
+                final_frame = frame_dev
 
             writer.stdin.write(final_frame.tobytes())
             frame_count += 1

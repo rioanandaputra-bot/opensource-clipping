@@ -7,6 +7,14 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.9.0] - 2026-04-20
+
+### Added
+- **Director's Console (Dev Mode)**: Implemented a professional debugging visualization for the `split-screen` / `dynamic-split` pipeline. Includes real-time HUD showing face counts, scene difference values, and layout switch hold timers.
+- **Visual Stability Calibration**: Added yellow face-boxes and white crop outlines in dev-mode for precision tuning.
+
+---
+
 ## [v0.8.9] - 2026-04-19
 
 ### Fixed
