@@ -335,6 +335,8 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 - `--track-smooth` : Faktor kecepatan kamera mengejar wajah (default: `0.30`). Makin besar makin cepat menyusul.
 - `--track-jitter` : Ambang batas pixel untuk mengabaikan getaran kecil (default: `5`).
 - `--track-snap` : Ambang batas lompatan wajah untuk memicu hard cut antar pembicara (default: `0.25`).
+- `--track-conf` : Ambang batas keyakinan (*confidence*) deteksi wajah (default: `0.55`). Naikkan jika banyak "deteksi hantu", turunkan jika wajah sering hilang.
+- `--track-smooth-window` : Jumlah frame untuk stabilisasi layout (default: `12`). (12 frame ≈ 0.5 dtk, 24 frame ≈ 1 dtk pada 24fps). Makin besar makin stabil.
 - `--track-lines` : Tampilkan garis crosshair kuning yang menghubungkan kotak wajah dengan batas window 9:16. Membantu melihat posisi wajah relatif terhadap area potong secara dinamis.
 - `--dev-mode` : **[Eksperimental]** Aktifkan mode visualisasi "Director" untuk rasio 9:16. Menampilkan context 16:9 penuh dengan background yang digelapkan, garis batas window, dan label tracking. Sangat berguna untuk kalibrasi kecepatan dan responsivitas AI tracking.
 

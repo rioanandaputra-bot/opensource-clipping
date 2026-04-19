@@ -343,19 +343,31 @@ def _build_parser() -> argparse.ArgumentParser:
         "--track-smooth",
         type=float,
         default=None,
-        help="Camera smoothing factor (default: 0.30)",
+        help="Camera smoothing speed (default: 0.30)",
     )
     p.add_argument(
         "--track-jitter",
         type=int,
         default=None,
-        help="Micro-jitter pixel threshold (default: 5)",
+        help="Pixel jitter threshold (default: 5)",
     )
     p.add_argument(
         "--track-snap",
         type=float,
         default=None,
-        help="Speaker switch snap ratio threshold (default: 0.25)",
+        help="Face jump snap threshold (default: 0.25)",
+    )
+    p.add_argument(
+        "--track-conf",
+        type=float,
+        default=0.55,
+        help="[Experimental] Higher confidence threshold for face detection to prevent ghosts (default: 0.55)",
+    )
+    p.add_argument(
+        "--track-smooth-window",
+        type=int,
+        default=12,
+        help="[Experimental] Majority-vote window for layout switching stability (default: 12 frames)",
     )
 
     return p
@@ -449,6 +461,8 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         track_smooth=args.track_smooth,
         track_jitter=args.track_jitter,
         track_snap=args.track_snap,
+        track_conf=args.track_conf,
+        track_smooth_window=args.track_smooth_window,
         box_face_detection=args.box_face_detection,
         dev_mode=args.dev_mode,
         track_lines=args.track_lines,

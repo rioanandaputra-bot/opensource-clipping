@@ -7,6 +7,15 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.8.5] - 2026-04-19
+
+### Added
+- **Exposed Tracking Tuning Parameters**: Added new CLI flags for manual stability adjustment:
+  - `--track-conf`: Confidence threshold for face detection.
+  - `--track-smooth-window`: Frame window for majority-vote layout stability (includes time conversion guide in README).
+
+---
+
 ## [v0.8.4] - 2026-04-19
 
 ### Added

@@ -1614,7 +1614,8 @@ def buat_video_split_screen(
 
         if cfg.face_detector == "yolo":
             # Higher confidence to filter background noise (microphones, reflections)
-            yolo_results = yolo_model(frame, verbose=False, conf=0.55)
+            det_conf = getattr(cfg, "track_conf", 0.55)
+            yolo_results = yolo_model(frame, verbose=False, conf=det_conf)
             if yolo_results and len(yolo_results[0].boxes) > 0:
                 raw_boxes = yolo_results[0].boxes.xyxy.cpu().numpy()
                 
@@ -1899,7 +1900,7 @@ def buat_video_split_screen(
     last_switch_time = 0.0
     
     # Stability window for layout decisions (Majority Vote of face counts)
-    LAYOUT_SMOOTH_WINDOW = 12 # ~0.5s at 24fps
+    LAYOUT_SMOOTH_WINDOW = getattr(cfg, "track_smooth_window", 12)
     face_count_history = []
     MIN_HOLD = float(getattr(cfg, "switch_hold_duration", 2.0))
     is_dynamic = getattr(cfg, "use_dynamic_split", False)
