@@ -7,6 +7,13 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.8.6] - 2026-04-19
+
+### Fixed
+- **Instant Layout Reset on Scene Cuts**: Added a visual scene-cut detector that clears the layout stability history immediately when a camera cut occurs. This eliminates the "lag" where the video stayed in split-screen for ~1s after a cut to a solo shot.
+
+---
+
 ## [v0.8.5] - 2026-04-19
 
 ### Added

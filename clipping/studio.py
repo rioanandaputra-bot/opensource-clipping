@@ -1904,6 +1904,10 @@ def buat_video_split_screen(
     face_count_history = []
     MIN_HOLD = float(getattr(cfg, "switch_hold_duration", 2.0))
     is_dynamic = getattr(cfg, "use_dynamic_split", False)
+    
+    # Scene cut detection state
+    prev_small_gray = None
+    SCENE_CUT_THRESHOLD = 30 # Adjust if needed
 
     try:
         cap.set(cv2.CAP_PROP_POS_MSEC, start_clip * 1000)
@@ -1932,6 +1936,18 @@ def buat_video_split_screen(
                         (0, 255, 255),
                         3,
                     )
+
+            # --- Scene Cut Detection ---
+            # Lightweight check: if pixels change drastically, clear stability history to allow instant switch
+            curr_small = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (64, 64))
+            if prev_small_gray is not None:
+                diff = cv2.absdiff(curr_small, prev_small_gray)
+                avg_diff = np.mean(diff)
+                if avg_diff > SCENE_CUT_THRESHOLD:
+                    face_count_history.clear()
+                    # Also temporarily lower MIN_HOLD requirement for this frame to cut instantly
+                    last_switch_time = t - MIN_HOLD 
+            prev_small_gray = curr_small
 
             timestamp_abs = start_clip + t
             from .diarization import get_active_speakers
