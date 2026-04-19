@@ -1898,12 +1898,14 @@ def buat_video_split_screen(
 
     current_layout = "split"
     current_speaker = None
-    last_switch_time = 0.0
+    MIN_HOLD = float(getattr(cfg, "switch_hold_duration", 2.0))
+    # Initialize with a large negative time to allow instant layout decision at t=0
+    last_switch_time = -MIN_HOLD
     
     # Stability window for layout decisions (Majority Vote of face counts)
     LAYOUT_SMOOTH_WINDOW = getattr(cfg, "track_smooth_window", 12)
     face_count_history = []
-    MIN_HOLD = float(getattr(cfg, "switch_hold_duration", 2.0))
+    # (MIN_HOLD is already initialized above)
     is_dynamic = getattr(cfg, "use_dynamic_split", False)
     
     # Scene cut detection state

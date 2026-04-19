@@ -25,7 +25,7 @@ def main():
         sys.exit(1)
 
     print("=" * 70)
-    print("🎬 OpenSource Clipping v0.8.8")
+    print("🎬 OpenSource Clipping v0.8.9")
     print("=" * 70)
     print(f"   URL         : {cfg.url_youtube}")
     print(f"   Jumlah Clip : {cfg.jumlah_clip}")
