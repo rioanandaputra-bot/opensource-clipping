@@ -295,6 +295,7 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 
 **🎙️ Pengaturan Split-Screen (Podcast)**
 - `--split-screen` : Aktifkan mode split-screen atas-bawah untuk video podcast. Mendukung **3+ speaker lintas scene**. Menggunakan **Pyannote** untuk mendeteksi siapa yang berbicara.
+- `--dynamic-split` : Aktifkan mode dinamis yang otomatis berpindah antara full-screen (saat 1 orang bicara) dan split-screen (saat 2 orang bicara). Memerlukan flag `--split-screen`.
 - `--diarization-speakers` : Jumlah speaker yang diharapkan (default: `auto`). Mode `auto` akan melakukan visual scanning otomatis untuk menghitung jumlah wajah terbanyak di satu frame untuk mencegah *over-segmentation*. Memerlukan `HF_TOKEN` di file `.env`.
 
 > ⚠️ **Catatan**: Untuk menggunakan split-screen, Anda perlu:

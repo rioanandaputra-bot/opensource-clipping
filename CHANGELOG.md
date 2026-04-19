@@ -7,6 +7,17 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Minor (x.Y.z)**: Incremented for new functionality introduced in a backward-compatible manner.
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
+## [v0.8.1] - 2026-04-19
+
+### Added
+- **Dynamic Split-Screen Mode** (`--dynamic-split`): New feature for split-screen layouts that automatically switches between full-screen and split-screen based on speaker activity. 
+  - If 1 speaker is active, the system renders a full 9:16 crop on that speaker.
+  - If 2+ speakers are active, the system renders the standard top-bottom split.
+  - Includes a "hold duration" to prevent flickering during rapid dialogue.
+- **Subtitle Tracking for Split-Screen**: Subtitles now correctly follow the speaker's face in both full and split layouts when using `--dynamic-split`.
+
+---
+
 ## [v0.8.0] - 2026-04-19
 
 ### Fixed

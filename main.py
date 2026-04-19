@@ -25,7 +25,7 @@ def main():
         sys.exit(1)
 
     print("=" * 70)
-    print("🎬 OpenSource Clipping v0.7.3")
+    print("🎬 OpenSource Clipping v0.8.1")
     print("=" * 70)
     print(f"   URL         : {cfg.url_youtube}")
     print(f"   Jumlah Clip : {cfg.jumlah_clip}")
@@ -37,6 +37,8 @@ def main():
     print(f"   BGM         : {'ON' if cfg.use_auto_bgm else 'OFF'}")
     print(f"   Karaoke     : {'ON' if cfg.use_karaoke_effect else 'OFF'}")
     print(f"   Split-Screen: {'ON' if cfg.use_split_screen else 'OFF'}")
+    if cfg.use_split_screen:
+        print(f"   Dynamic Split: {'ON' if cfg.use_dynamic_split else 'OFF'}")
     print(f"   Whisper     : {cfg.whisper_model} ({cfg.whisper_device})")
     print(f"   Gemini      : {cfg.gemini_model}")
     print("=" * 70)

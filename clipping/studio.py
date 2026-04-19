@@ -1538,20 +1538,27 @@ def buat_video_split_screen(
     panel_h = (out_h - DIVIDER_HEIGHT) // 2  # height per speaker panel
     panel_w = out_w
 
-    # Crop dimensions for each panel from the source frame
-    # Each panel crops a region from the full frame suitable for the panel aspect ratio
+    # --- Panel Crop dimensions (wider aspect for half-height panels) ---
     panel_ratio = panel_w / panel_h
     if (width / height) > panel_ratio:
-        # source is wider — crop width
         crop_h = height
         crop_w = int(height * panel_ratio)
     else:
-        # source is taller — crop height
         crop_w = width
         crop_h = int(width / panel_ratio)
 
+    # --- Full 9:16 Crop dimensions (for solo mode) ---
+    full_ratio = out_w / out_h
+    if (width / height) > full_ratio:
+        crop_h_full = height
+        crop_w_full = int(height * full_ratio)
+    else:
+        crop_w_full = width
+        crop_h_full = int(width / full_ratio)
+
     default_x = (width - crop_w) // 2
     default_y = (height - crop_h) // 2
+    default_x_full = (width - crop_w_full) // 2
 
     # ----------------------------------------------------------------
     # Determine top/bottom panel speakers by speaking time in this clip
@@ -1833,12 +1840,19 @@ def buat_video_split_screen(
     # so any panel can fallback when its speaker is not in the current scene
     last_valid_crop: dict[str, np.ndarray] = {}
 
+    current_layout = "split"
+    current_speaker = None
+    last_switch_time = 0.0
+    MIN_HOLD = float(getattr(cfg, "switch_hold_duration", 2.0))
+    is_dynamic = getattr(cfg, "use_dynamic_split", False)
+
     try:
         cap.set(cv2.CAP_PROP_POS_MSEC, start_clip * 1000)
         frame_count = 0
         last_render_percent = -1
 
-        print(f"🎬 {label} - Render split-screen dimulai...", flush=True)
+        print(f"🎬 {label} - Render split-screen {'(dynamic)' if is_dynamic else ''} dimulai...", flush=True)
+        tracking_log = [] # Store (t, cx) for subtitle tracking
 
         while True:
             ret, frame = cap.read()
@@ -1861,108 +1875,111 @@ def buat_video_split_screen(
                     )
 
             timestamp_abs = start_clip + t
+            from .diarization import get_active_speakers
+            active_speakers = get_active_speakers(diarization_data, timestamp_abs)
             active_speaker = get_active_speaker(diarization_data, timestamp_abs)
 
-            # Determine which speakers populate each panel this frame
-            # Extra speakers (3rd, 4th…) temporarily take over one panel
-            if active_speaker and active_speaker not in (speaker_top, speaker_bottom):
-                # 3rd-party speaker is active → show them in top panel,
-                # keep the OTHER primary speaker (not the active extra) in bottom
-                panel_top_spk = active_speaker
-                panel_bottom_spk = speaker_bottom
-            else:
-                panel_top_spk = speaker_top
-                panel_bottom_spk = speaker_bottom
-
-            # Detect whether the current scene is a solo shot
-            in_solo_scene = bool(
-                active_speaker and speaker_is_solo.get(active_speaker, False)
-            )
-
-            # ---- Helper: build a panel crop for a given speaker ----
-            def _build_panel(spk, is_other_panel_spk=False):
-                """Return (panel_img, used_fallback) for the given speaker."""
-                # Check if this speaker is NOT visible in the current frame
-                spk_not_visible = (
-                    active_speaker in all_speakers_in_clip
-                    and active_speaker != spk
-                    and (
-                        speaker_is_solo.get(spk, False)
-                        or (
-                            in_solo_scene
-                            and not speaker_is_solo.get(spk, False)
-                        )
-                    )
-                )
-                if spk_not_visible:
-                    # Use frozen frame for this speaker
-                    if spk in last_valid_crop:
-                        return last_valid_crop[spk].copy(), True
-                    else:
-                        return cv2.resize(
-                            frame[0:crop_h, default_x : default_x + crop_w],
-                            (panel_w, panel_h),
-                        ), True
+            # --- Layout decision logic ---
+            if is_dynamic:
+                if len(active_speakers) == 1:
+                    target_layout = "full"
+                    target_speaker = active_speakers[0]
+                elif len(active_speakers) >= 2:
+                    target_layout = "split"
+                    target_speaker = active_speakers[0] # Not used in split but for tracking
                 else:
-                    cx = _get_x(spk, t)
-                    crop = cv2.resize(
-                        frame[0:crop_h, cx : cx + crop_w],
-                        (panel_w, panel_h),
-                    )
-                    # Update frozen frame cache when speaker is actually visible
-                    if not in_solo_scene or active_speaker == spk:
-                        last_valid_crop[spk] = crop.copy()
-                    return crop, False
-
-            # ---- Top panel ----
-            panel_top, is_fallback_top = _build_panel(panel_top_spk)
-
-            # ---- Bottom panel ----
-            panel_bottom, is_fallback_bottom = _build_panel(panel_bottom_spk)
-
-            # ---- Active / inactive highlighting ----
-            if active_speaker == panel_top_spk:
-                panel_bottom = cv2.addWeighted(
-                    panel_bottom, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0
-                )
-                cv2.rectangle(
-                    panel_top,
-                    (0, 0),
-                    (panel_w - 1, panel_h - 1),
-                    (0, 255, 255),
-                    ACTIVE_BORDER,
-                )
-            elif active_speaker == panel_bottom_spk:
-                panel_top = cv2.addWeighted(
-                    panel_top, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0
-                )
-                cv2.rectangle(
-                    panel_bottom,
-                    (0, 0),
-                    (panel_w - 1, panel_h - 1),
-                    (0, 255, 255),
-                    ACTIVE_BORDER,
-                )
+                    target_layout = current_layout # Stay put
+                    target_speaker = current_speaker
+                
+                if target_layout != current_layout and (t - last_switch_time) >= MIN_HOLD:
+                    current_layout = target_layout
+                    current_speaker = target_speaker
+                    last_switch_time = t
+                
+                if current_layout == "full":
+                    # If someone else starts talking, we might want to switch speaker even in full mode
+                    if len(active_speakers) == 1 and active_speakers[0] != current_speaker:
+                        if (t - last_switch_time) >= MIN_HOLD:
+                            current_speaker = active_speakers[0]
+                            last_switch_time = t
             else:
-                # Dim any fallback panels so the active panel stands out
-                if is_fallback_top:
-                    panel_top = cv2.addWeighted(
-                        panel_top, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0
-                    )
-                if is_fallback_bottom:
-                    panel_bottom = cv2.addWeighted(
-                        panel_bottom, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0
-                    )
+                current_layout = "split"
 
-            # Compose the final frame: top panel + divider + bottom panel
-            divider = np.full(
-                (DIVIDER_HEIGHT, panel_w, 3), 80, dtype=np.uint8
-            )  # gray divider
-            final_frame = np.vstack([panel_top, divider, panel_bottom])
+            if current_layout == "full":
+                # Solo mode: Render full 9:16 crop
+                spk = current_speaker or (speaker_top if speaker_top in ranked else ranked[0])
+                cx_panel = _get_x(spk, t)
+                # Convert panel-crop X to full-crop X
+                cx_full = int(max(0, min(cx_panel + (crop_w - crop_w_full) // 2, width - crop_w_full)))
+                
+                crop = frame[0:crop_h_full, cx_full : cx_full + crop_w_full]
+                final_frame = cv2.resize(crop, (out_w, out_h))
+            else:
+                # Split mode: existing logic
+                if active_speaker and active_speaker not in (speaker_top, speaker_bottom):
+                    panel_top_spk = active_speaker
+                    panel_bottom_spk = speaker_bottom
+                else:
+                    panel_top_spk = speaker_top
+                    panel_bottom_spk = speaker_bottom
+
+                # Detect whether the current scene is a solo shot
+                in_solo_scene = bool(active_speaker and speaker_is_solo.get(active_speaker, False))
+
+                # ---- Helper: build a panel crop for a given speaker ----
+                def _build_panel(spk, is_other_panel_spk=False):
+                    spk_not_visible = (
+                        active_speaker in all_speakers_in_clip
+                        and active_speaker != spk
+                        and (speaker_is_solo.get(spk, False) or (in_solo_scene and not speaker_is_solo.get(spk, False)))
+                    )
+                    if spk_not_visible:
+                        if spk in last_valid_crop:
+                            return last_valid_crop[spk].copy(), True
+                        else:
+                            return cv2.resize(frame[0:crop_h, default_x : default_x + crop_w], (panel_w, panel_h)), True
+                    else:
+                        cx = _get_x(spk, t)
+                        crop = cv2.resize(frame[0:crop_h, cx : cx + crop_w], (panel_w, panel_h))
+                        if not in_solo_scene or active_speaker == spk:
+                            last_valid_crop[spk] = crop.copy()
+                        return crop, False
+
+                # ---- Top panel ----
+                panel_top, is_fallback_top = _build_panel(panel_top_spk)
+
+                # ---- Bottom panel ----
+                panel_bottom, is_fallback_bottom = _build_panel(panel_bottom_spk)
+
+                # ---- Active / inactive highlighting ----
+                if active_speaker == panel_top_spk:
+                    panel_bottom = cv2.addWeighted(panel_bottom, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0)
+                    cv2.rectangle(panel_top, (0, 0), (panel_w - 1, panel_h - 1), (0, 255, 255), ACTIVE_BORDER)
+                elif active_speaker == panel_bottom_spk:
+                    panel_top = cv2.addWeighted(panel_top, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0)
+                    cv2.rectangle(panel_bottom, (0, 0), (panel_w - 1, panel_h - 1), (0, 255, 255), ACTIVE_BORDER)
+                else:
+                    if is_fallback_top:
+                        panel_top = cv2.addWeighted(panel_top, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0)
+                    if is_fallback_bottom:
+                        panel_bottom = cv2.addWeighted(panel_bottom, 1.0 - INACTIVE_ALPHA, dark_overlay, INACTIVE_ALPHA, 0)
+
+                # Compose the final frame
+                divider = np.full((DIVIDER_HEIGHT, panel_w, 3), 80, dtype=np.uint8)
+                final_frame = np.vstack([panel_top, divider, panel_bottom])
+
 
             # Ensure exact output dimensions
             if final_frame.shape[0] != out_h or final_frame.shape[1] != out_w:
                 final_frame = cv2.resize(final_frame, (out_w, out_h))
+
+            # Store tracking for subtitles (use center in split mode)
+            if current_layout == "full":
+                tracking_log.append((t, cx_full))
+            else:
+                # In split mode, the 1080px frame is centered at width/2 of the original usually
+                # or we can just say subtitles are centered in the 9:16 window.
+                tracking_log.append((t, default_x_full))
 
             writer.stdin.write(final_frame.tobytes())
             frame_count += 1
@@ -1989,6 +2006,17 @@ def buat_video_split_screen(
 
     finally:
         cap.release()
+
+    def get_x_final(t):
+        if not tracking_log: return default_x_full
+        # Simple lookup
+        for i in range(len(tracking_log)-1):
+            if tracking_log[i][0] <= t <= tracking_log[i+1][0]:
+                return int(tracking_log[i][1])
+        return int(tracking_log[-1][1]) if tracking_log else default_x_full
+
+    return get_x_final
+
 
 
 def buat_video_camera_switch(
@@ -2641,7 +2669,7 @@ def proses_klip(
             get_x_h = None
             if use_split:
                 print("   📸 [Hook] Split-screen render...")
-                buat_video_split_screen(
+                get_x_h = buat_video_split_screen(
                     cfg.file_video_asli,
                     h_silent,
                     h_start,
@@ -2729,7 +2757,7 @@ def proses_klip(
         # MAIN
         if use_split:
             print("   📸 [Main] Split-screen render (Visual)...")
-            buat_video_split_screen(
+            get_x_main = buat_video_split_screen(
                 cfg.file_video_asli,
                 m_silent,
                 m_start,
