@@ -1384,13 +1384,19 @@ def siapkan_glitch_video(rasio, cfg, video_encoder):
         return glitch_ts
 
     if not os.path.exists("glitch_raw.mp4"):
-        YoutubeDL(
-            {
-                "format": "best[ext=mp4]",
-                "outtmpl": "glitch_raw.mp4",
-                "quiet": True,
-            }
-        ).download([cfg.url_glitch_video])
+        ydl_opts = {
+            "format": "best[ext=mp4]",
+            "outtmpl": "glitch_raw.mp4",
+            "quiet": True,
+            "remote_components": ["ejs:github"],
+            "js_runtimes": {"node": {"path": "/usr/bin/node"}},
+        }
+
+        cookiefile = os.path.abspath(os.path.join(os.getcwd(), "cookies.txt"))
+        if os.path.exists(cookiefile):
+            ydl_opts["cookiefile"] = cookiefile
+
+        YoutubeDL(ydl_opts).download([cfg.url_glitch_video])
 
     filter_g = (
         "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920,setsar=1"
