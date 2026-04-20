@@ -160,7 +160,7 @@ python main.py --help
 | `--box-face-detection` | `False` | Tampilkan kotak kuning deteksi wajah (debug) |
 | `--dev-mode` | `False` | **[Eksperimental]** Aktifkan visualisasi konteks 16:9 untuk proses tracking/stabilisasi 9:16 |
 | `--dev-mode-with-output` | `False` | **[Eksperimental]** Menghasilkan video final dan video "Director's Console" secara bersamaan di file terpisah. |
-| `--dev-mode-with-output-merge` | `False` | **[Eksperimental]** Menghasilkan satu video side-by-side (2527x1080) yang menyatukan video final dan "Director's Console". |
+| `--dev-mode-with-output-merge` | `False` | **[Eksperimental]** Menghasilkan satu video side-by-side (2648x1220) yang menyatukan video final dan "Director's Console". |
 | `--track-lines` | `False` | Tampilkan garis crosshair kuning dari kotak wajah ke batas window tracking |
 | `--yolo-size` | `8m` | Parameter model YOLO ADetailer (`8n`, `8s`, `8m`, `8n_v2`, `9c`) |
 | `--whisper-model` | `large-v3` | Ukuran model Whisper ([lihat daftar model](https://github.com/SYSTRAN/faster-whisper?tab=readme-ov-file#whisper)) |
@@ -348,7 +348,7 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 - `--track-lines` : Tampilkan garis crosshair kuning untuk kalibrasi visual window 9:16.
 - `--dev-mode` : **[Eksperimental]** Aktifkan mode visualisasi "Director" untuk rasio 9:16. Sangat berguna untuk kalibrasi responsivitas AI tracking.
 - `--dev-mode-with-output` : Menghasilkan **dua** file `mp4` secara bersamaan: video 9:16 standar dan video 1920x1080 "Director's Console" (menghemat waktu proses AI).
-- `--dev-mode-with-output-merge` : Menghasilkan output **side-by-side** (2527x1080) yang menggabungkan video akhir dan "Director's Console" dalam satu layar selebar ultrawide. Sangat cocok untuk verifikasi real-time!
+- `--dev-mode-with-output-merge` : Menghasilkan output **side-by-side** (2648x1220) yang menggabungkan video akhir dan "Director's Console" dalam satu layar selebar ultrawide. Sangat cocok untuk verifikasi real-time!
 
 > 💡 **Skenario rendering Camera Switch:**
 > - **Satu speaker aktif** → crop full 9:16 mengikuti wajah speaker tersebut

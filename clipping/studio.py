@@ -1542,8 +1542,8 @@ def buat_video_split_screen(
     merge_output = cfg.dev_mode_with_output_merge
     
     if merge_output:
-        # Merged Canvas: 2527 x 1080
-        out_w_final, out_h_final = 2527, 1080
+        # Merged Full Padded Canvas: 2648 x 1220
+        out_w_final, out_h_final = 2648, 1220
     elif dev_visualize and not dual_output:
         # Pure Dev Mode (override output)
         out_w_final, out_h_final = 1920, 1080
@@ -2205,10 +2205,24 @@ def buat_video_split_screen(
                 writer_dev.stdin.write(frame_dev.tobytes())
                 
             elif merge_output:
-                # Scale portrait to height=1080 -> 607x1080
-                frm_normal_small = cv2.resize(final_frame, (607, 1080))
-                # Combine landscape dev (1920x1080) + portrait small (607x1080) = 2527x1080
-                frm_merged = np.hstack([frame_dev, frm_normal_small])
+                # Resize normal portrait output to fit the 1080 height evenly
+                frm_normal_small = cv2.resize(final_frame, (608, 1080))
+                
+                # Create dark grey large canvas backdrop
+                frm_merged = np.full((1220, 2648, 3), 30, dtype=np.uint8)
+                
+                # Title texts (Legends)
+                cv2.putText(frm_merged, "DIRECTOR'S CONSOLE (16:9 RAW)", (40, 70), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+                cv2.putText(frm_merged, "FINAL OUTPUT (9:16 CROP)", (2000, 70), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+                
+                # Bounding Boxes (Drawn slightly outwards to act as neat white borders)
+                cv2.rectangle(frm_merged, (38, 98), (40+1920+2, 100+1080+2), (255, 255, 255), 4)
+                cv2.rectangle(frm_merged, (1998, 98), (2000+608+2, 100+1080+2), (255, 255, 255), 4)
+                
+                # Paste the literal video frames onto the exact pixel coordinates
+                frm_merged[100:1180, 40:1960] = frame_dev
+                frm_merged[100:1180, 2000:2608] = frm_normal_small
+                
                 writer_main.stdin.write(frm_merged.tobytes())
                 
             else:
