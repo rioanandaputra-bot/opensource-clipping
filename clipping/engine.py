@@ -5,6 +5,7 @@ Maps to Cell 2 (The Engine) of the notebook.
 """
 
 import json
+import os
 import re
 import time
 
@@ -20,6 +21,8 @@ def download_video(url: str, output_path: str, use_dlp_subs: bool = False) -> No
     """Download a YouTube video to *output_path* (max 1080p)."""
     print("[1/3] Mendownload video dari YouTube...")
 
+    cookiefile = os.path.abspath(os.path.join(os.getcwd(), "cookies.txt"))
+
     ydl_opts = {
         "format": (
             "best[height<=?1080][ext=mp4][acodec!=none][vcodec!=none]/"
@@ -32,6 +35,10 @@ def download_video(url: str, output_path: str, use_dlp_subs: bool = False) -> No
         "merge_output_format": "mp4",
         "remote_components": ["ejs:github"],
     }
+
+    if os.path.exists(cookiefile):
+        ydl_opts["cookiefile"] = cookiefile
+        print(f"      🍪 Menggunakan cookies dari: {cookiefile}")
 
     if use_dlp_subs:
         print("      Mencoba mencari subtitle bahasa otomatis (en / id)...")
