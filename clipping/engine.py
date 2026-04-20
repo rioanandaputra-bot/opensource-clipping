@@ -34,7 +34,7 @@ def download_video(url: str, output_path: str, use_dlp_subs: bool = False) -> No
         "quiet": True,
         "merge_output_format": "mp4",
         "remote_components": ["ejs:github"],
-        "js_runtimes": {"node": "/usr/bin/node"},
+        "js_runtimes": {"node": {"path": "/usr/bin/node"}},
     }
 
     if os.path.exists(cookiefile):
