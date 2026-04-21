@@ -9,7 +9,6 @@ import re
 import time
 from typing import Any
 
-import httpx
 from urllib.parse import urlsplit, urlunsplit
 
 
@@ -99,20 +98,52 @@ def _extract_json_text(text: str) -> str:
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE).strip()
         text = re.sub(r"\s*```$", "", text).strip()
-    if text.startswith("[") or text.startswith("{"):
-        return text
 
-    first_arr = text.find("[")
-    last_arr = text.rfind("]")
-    if first_arr != -1 and last_arr != -1 and last_arr > first_arr:
-        return text[first_arr : last_arr + 1]
+    def _balanced_slice(s: str, open_ch: str, close_ch: str) -> str:
+        start = s.find(open_ch)
+        if start == -1:
+            return ""
+        depth = 0
+        in_string = False
+        escape = False
+        for idx in range(start, len(s)):
+            ch = s[idx]
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == open_ch:
+                depth += 1
+            elif ch == close_ch:
+                depth -= 1
+                if depth == 0:
+                    return s[start : idx + 1]
+        return ""
 
-    first_obj = text.find("{")
-    last_obj = text.rfind("}")
-    if first_obj != -1 and last_obj != -1 and last_obj > first_obj:
-        return text[first_obj : last_obj + 1]
+    for open_ch, close_ch in (("[", "]"), ("{", "}")):
+        sliced = _balanced_slice(text, open_ch, close_ch)
+        if sliced:
+            return sliced
 
     return text
+
+
+def _extract_openai_content(message_obj: Any) -> str:
+    """Extract assistant text from an OpenAI-compatible message object."""
+    if message_obj is None:
+        return ""
+    if isinstance(message_obj, str):
+        return message_obj
+    if isinstance(message_obj, dict):
+        return (message_obj.get("content") or "").strip()
+    return (getattr(message_obj, "content", "") or "").strip()
 
 
 def _gateway_generate_json(client: dict, contents, config):
@@ -120,42 +151,49 @@ def _gateway_generate_json(client: dict, contents, config):
     api_key = client["api_key"]
     model = client["model"]
 
-    if not base_url:
-        raise RuntimeError("GATEWAY_BASE_URL tidak boleh kosong saat ai_provider=gateway.")
     if not api_key:
         raise RuntimeError("GATEWAY_API_KEY tidak boleh kosong saat ai_provider=gateway.")
     if not model:
         raise RuntimeError("GATEWAY_MODEL / --ai-model tidak boleh kosong saat ai_provider=gateway.")
 
-    url = f"{base_url}/chat/completions"
-    payload: dict[str, Any] = {
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are a precise JSON generator. Reply with a valid JSON array only, without markdown or explanation.",
-            },
-            {"role": "user", "content": contents},
-        ],
-        "temperature": 0.2,
-    }
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": "OpenSource-Clipping/0.9.4",
-    }
-
-    with httpx.Client(timeout=15 * 60, follow_redirects=True) as http:
-        resp = http.post(url, headers=headers, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-
+    # Prefer OpenAI SDK; it is the standard client for OpenAI-compatible gateways.
     try:
-        text = data["choices"][0]["message"]["content"]
+        from openai import OpenAI
     except Exception as exc:
-        raise RuntimeError(f"Gateway response tidak memiliki choices[0].message.content: {data}") from exc
+        raise RuntimeError(
+            "Package 'openai' belum terpasang. Install/upgrade dengan pip install -U openai."
+        ) from exc
+
+    client_kwargs: dict[str, Any] = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+
+    timeout_seconds = float(getattr(config, "ai_timeout_seconds", 1800) or 1800)
+    max_tokens = getattr(config, "ai_max_tokens", None)
+    if max_tokens is None:
+        max_tokens = 8192
+
+    payload_messages = [
+        {
+            "role": "system",
+            "content": "You are an Art Director, Video Editor, and Metadata Strategist for short-form content. Return ONLY a valid JSON array. Do not wrap in markdown or code fences. Every clip object MUST include rank, hook_start_time, hook_end_time, start_time, end_time, typography_plan, broll_list, alasan, bgm_mood, title_indonesia, title_inggris, hastag, description_hook, description_context, keyword_tags, tiktok_title_id, tiktok_caption_id, and tiktok_caption. The time fields are mandatory and must be numbers.",
+        },
+        {"role": "user", "content": contents},
+    ]
+
+    client_openai = OpenAI(**client_kwargs)
+    response = client_openai.chat.completions.create(
+        model=model,
+        messages=payload_messages,
+        temperature=0.2,
+        stream=False,
+        max_tokens=max_tokens,
+        top_p=1,
+    )
+
+    text = _extract_openai_content(response.choices[0].message)
+    if not text:
+        raise RuntimeError("Gateway mengembalikan text kosong dari OpenAI SDK.")
 
     return json.loads(_extract_json_text(text))
 

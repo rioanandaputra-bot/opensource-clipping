@@ -150,6 +150,7 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview").strip()
 GATEWAY_BASE_URL = os.environ.get("GATEWAY_BASE_URL", "https://ai.wiiverdigital.com/v1").strip()
 GATEWAY_API_KEY = os.environ.get("GATEWAY_API_KEY", "").strip()
 GATEWAY_MODEL = os.environ.get("GATEWAY_MODEL", "").strip()
+AI_TIMEOUT_SECONDS = int(os.environ.get("AI_TIMEOUT_SECONDS", "1800") or "1800")
 
 
 # ==============================================================================
@@ -342,6 +343,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="AI model name to use for the selected provider",
     )
     p.add_argument(
+        "--ai-timeout-seconds",
+        type=int,
+        default=AI_TIMEOUT_SECONDS,
+        help="Timeout for AI gateway/Gemini HTTP calls in seconds",
+    )
+    p.add_argument(
         "--box-face-detection",
         action="store_true",
         help="Draw a yellow bounding box around the detected face for debugging/tracking visualization",
@@ -521,6 +528,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         whisper_compute_type=args.whisper_compute_type,
         # AI
         ai_model=args.ai_model_flag or (GEMINI_MODEL if args.ai_provider == "gemini" else GATEWAY_MODEL),
+        ai_timeout_seconds=args.ai_timeout_seconds,
         gemini_model=GEMINI_MODEL,
         gateway_model=GATEWAY_MODEL,
         # Tracking Tuning

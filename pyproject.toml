@@ -8,6 +8,7 @@ dependencies = [
     "yt-dlp[default]",
     "faster-whisper",
     "google-genai",
+    "openai",
     "mediapipe",
     "opencv-python",
     "Pillow",

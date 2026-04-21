@@ -5,6 +5,7 @@ Maps to the QA Metadata Preview cell in the notebook.
 """
 
 import json
+from typing import Any
 
 
 # ==============================================================================
@@ -95,6 +96,42 @@ def _looks_indonesian(text):
 # MAIN API
 # ==============================================================================
 
+def _coerce_float(value: Any, fallback: float | None = None) -> float | None:
+    try:
+        if value is None or value == "":
+            return fallback
+        return float(value)
+    except Exception:
+        return fallback
+
+
+def _ensure_time_fields(item: dict) -> dict:
+    """Normalize time keys from possible AI variations and enforce required time fields."""
+    start = item.get("start_time", item.get("start", item.get("clip_start_time")))
+    end = item.get("end_time", item.get("end", item.get("clip_end_time")))
+    hook_start = item.get("hook_start_time", item.get("hook_start", start))
+    hook_end = item.get("hook_end_time", item.get("hook_end", None))
+
+    start_f = _coerce_float(start)
+    end_f = _coerce_float(end)
+    hook_start_f = _coerce_float(hook_start, start_f)
+    hook_end_f = _coerce_float(hook_end, None)
+
+    if start_f is None or end_f is None:
+        raise ValueError(
+            f"Clip rank={item.get('rank', '?')} wajib punya start_time dan end_time dari AI gateway. Ditemukan: start={start!r}, end={end!r}"
+        )
+
+    if hook_end_f is None:
+        hook_end_f = min(end_f, hook_start_f + 3.0)
+
+    item["start_time"] = start_f
+    item["end_time"] = end_f
+    item["hook_start_time"] = hook_start_f
+    item["hook_end_time"] = hook_end_f
+    return item
+
+
 def normalize_and_validate(hasil_json: list[dict]) -> list[dict]:
     """
     Normalize and enrich metadata fields, add *_final fields.
@@ -104,8 +141,16 @@ def normalize_and_validate(hasil_json: list[dict]) -> list[dict]:
     laporan = []
     semua_warning = []
 
-    for item in hasil_json:
+    clean_items = []
+    for idx, item in enumerate(hasil_json, start=1):
+        if not isinstance(item, dict):
+            continue
+        if "rank" not in item or item.get("rank") in (None, ""):
+            item["rank"] = idx
         rank = item.get("rank", "?")
+
+        item = _ensure_time_fields(item)
+        clean_items.append(item)
 
         item["title_indonesia"] = _trim_title(item.get("title_indonesia", ""))
         item["title_inggris"] = _trim_title(item.get("title_inggris", ""))
@@ -197,7 +242,7 @@ def normalize_and_validate(hasil_json: list[dict]) -> list[dict]:
         if warning:
             semua_warning.append((rank, warning))
 
-    hasil_json = sorted(hasil_json, key=lambda x: x.get("rank", 9999))
+    hasil_json = sorted(clean_items, key=lambda x: x.get("rank", 9999))
     laporan = sorted(laporan, key=lambda x: x["rank"])
 
     return hasil_json
@@ -216,17 +261,18 @@ def print_preview(hasil_json: list[dict]) -> None:
     print()
 
     print("===== PREVIEW DETAIL PER KLIP =====")
-    for item in hasil_json:
-        print(f"\n--- Rank {item['rank']} ---")
-        print(f"Title ID          : {item['title_indonesia']}")
-        print(f"Title EN          : {item['title_inggris']}")
+    for idx, item in enumerate(hasil_json, start=1):
+        rank = item.get('rank', idx)
+        print(f"\n--- Rank {rank} ---")
+        print(f"Title ID          : {item.get('title_indonesia', '')}")
+        print(f"Title EN          : {item.get('title_inggris', '')}")
         print(f"TikTok Title ID   : {item.get('tiktok_title_id_final', '')}")
-        print(f"Hashtag           : {item['hastag']}")
-        print(f"Hook Desc         : {item['description_hook']}")
-        print(f"Ctx Desc          : {item['description_context']}")
-        print(f"YT Desc           : {item['youtube_description_final']}")
-        print(f"YT Tags           : {item['youtube_tags_final']}")
-        print(f"TikTok EN         : {item['tiktok_caption_final']}")
+        print(f"Hashtag           : {item.get('hastag', '')}")
+        print(f"Hook Desc         : {item.get('description_hook', '')}")
+        print(f"Ctx Desc          : {item.get('description_context', '')}")
+        print(f"YT Desc           : {item.get('youtube_description_final', '')}")
+        print(f"YT Tags           : {item.get('youtube_tags_final', [])}")
+        print(f"TikTok EN         : {item.get('tiktok_caption_final', '')}")
         print(f"TikTok Caption ID : {item.get('tiktok_caption_id_final', '')}")
 
 
