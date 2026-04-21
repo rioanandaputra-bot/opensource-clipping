@@ -15,11 +15,22 @@ outputs/
 *.ts
 *.ass
 *.jpg
+*.jpeg
+*.png
+*.webp
 *.tflite
 *.mp3
+*.wav
 custom_fonts/
 render_manifest*.json
 metadata_preview.json
+video_asli.mp4
+glitch_raw.mp4
+glitch_ready_*.ts
+highlight_rank_*.mp4
+thumbnail_*.jpg
+thumbnail_*.jpeg
+thumbnail_*.png
 
 # Secrets
 .env
