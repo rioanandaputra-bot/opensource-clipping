@@ -8,7 +8,8 @@ import json
 import re
 import time
 from typing import Any
-from urllib import request as urllib_request
+
+import httpx
 from urllib.parse import urlsplit, urlunsplit
 
 
@@ -23,9 +24,11 @@ def _normalize_base_url(base_url: str) -> str:
         if path.endswith(suffix):
             path = path[: -len(suffix)]
             break
-    if not path:
-        path = ""
-    return urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment)).rstrip("/")
+
+    rebuilt = urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment)).rstrip("/")
+    if rebuilt.endswith("/api"):
+        rebuilt = rebuilt[:-4]
+    return rebuilt
 
 
 def build_client(cfg):
@@ -137,22 +140,18 @@ def _gateway_generate_json(client: dict, contents, config):
         "temperature": 0.2,
     }
 
-    body = json.dumps(payload).encode("utf-8")
-    req = urllib_request.Request(
-        url,
-        data=body,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-    )
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "OpenSource-Clipping/0.9.4",
+    }
 
-    with urllib_request.urlopen(req, timeout=15 * 60) as resp:
-        raw = resp.read().decode("utf-8", errors="replace")
+    with httpx.Client(timeout=15 * 60, follow_redirects=True) as http:
+        resp = http.post(url, headers=headers, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
 
-    data = json.loads(raw)
     try:
         text = data["choices"][0]["message"]["content"]
     except Exception as exc:
