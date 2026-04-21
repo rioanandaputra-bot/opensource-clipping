@@ -12,6 +12,8 @@ import time
 from yt_dlp import YoutubeDL
 from faster_whisper import WhisperModel
 
+from .ai_provider import build_client, generate_json_with_retry
+
 
 # ==============================================================================
 # TAHAP 1: DOWNLOAD VIDEO
@@ -229,110 +231,10 @@ def transcribe_video(
 
 
 # ==============================================================================
-# TAHAP 3: ANALISIS GEMINI AI
+# TAHAP 3: ANALISIS AI
 # ==============================================================================
 
-# ---- Retry Config ----
-MAX_ATTEMPTS = 10
-INITIAL_WAIT_SECONDS = 60
-WAIT_INCREMENT_SECONDS = 30
-REQUEST_TIMEOUT_MS = 15 * 60 * 1000  # 15 menit
-RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
-
-
-def _extract_status_code(exc: Exception):
-    for attr in ("status_code", "code", "status"):
-        value = getattr(exc, attr, None)
-        if isinstance(value, int):
-            return value
-        if isinstance(value, str) and value.isdigit():
-            return int(value)
-
-    match = re.search(r"\b(408|429|500|502|503|504)\b", str(exc))
-    return int(match.group(1)) if match else None
-
-
-def _is_retryable(exc: Exception) -> bool:
-    if isinstance(exc, json.JSONDecodeError):
-        return True
-
-    code = _extract_status_code(exc)
-    if code in RETRYABLE_STATUS_CODES:
-        return True
-
-    msg = str(exc).lower()
-    keywords = (
-        "timeout", "temporarily unavailable", "deadline",
-        "connection reset", "connection aborted", "service unavailable",
-    )
-    return any(k in msg for k in keywords)
-
-
-def _generate_json_with_retry(client, model, fallback_model, contents, config):
-    last_exc = None
-    status_code = None
-
-    for attempt in range(1, MAX_ATTEMPTS + 1):
-        try:
-            print(f"[Gemini] Attempt {attempt}/{MAX_ATTEMPTS}...")
-
-            response = client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=config,
-            )
-
-            text = getattr(response, "text", None)
-            if not text or not text.strip():
-                raise ValueError("Gemini mengembalikan response.text kosong.")
-
-            return json.loads(text)
-
-        except Exception as exc:
-            last_exc = exc
-            status_code = _extract_status_code(exc)
-            retryable = _is_retryable(exc)
-
-            print(
-                f"[Gemini] Attempt {attempt}/{MAX_ATTEMPTS} gagal | "
-                f"status={status_code} | error={exc}"
-            )
-
-            if (not retryable) or attempt == MAX_ATTEMPTS:
-                break
-
-            wait_seconds = INITIAL_WAIT_SECONDS + ((attempt - 1) * WAIT_INCREMENT_SECONDS)
-            print(f"[Gemini] Retry lagi dalam {wait_seconds} detik...")
-            time.sleep(wait_seconds)
-
-    print(f"[Gemini] Percobaan dengan model utama ({model}) gagal.")
-    if fallback_model:
-        print(f"[Gemini] Mencoba satu kali lagi dengan fallback model ({fallback_model})...")
-        try:
-            response = client.models.generate_content(
-                model=fallback_model,
-                contents=contents,
-                config=config,
-            )
-            text = getattr(response, "text", None)
-            if not text or not text.strip():
-                raise ValueError("Gemini fallback mengembalikan response.text kosong.")
-
-            return json.loads(text)
-        except Exception as exc_fallback:
-            print(f"[Gemini] Fallback model gagal | error={exc_fallback}")
-            raise RuntimeError(
-                f"Gagal memanggil Gemini utama & fallback. "
-                f"Laporan Utama status={status_code}, error={last_exc} | "
-                f"Laporan Fallback error={exc_fallback}"
-            ) from exc_fallback
-
-    raise RuntimeError(
-        f"Gagal memanggil Gemini setelah {MAX_ATTEMPTS} percobaan. Error terakhir: {last_exc}"
-    ) from last_exc
-
-
-def analyze_with_gemini(
+def analyze_with_ai(
     transkrip_lengkap: str,
     cfg,
 ) -> list[dict]:
@@ -351,13 +253,13 @@ def analyze_with_gemini(
     list[dict]
         List of clip dicts parsed from Gemini JSON response.
     """
-    import google.genai as genai
     from google.genai import types
 
     jumlah_clip = cfg.jumlah_clip
     durasi_hook = cfg.durasi_hook
 
-    print(f"[3/3] Menganalisis Top {jumlah_clip} momen terbaik + Typography Plan menggunakan Gemini...")
+    provider_label = "Gateway" if getattr(cfg, "ai_provider", "gemini") == "gateway" else "Gemini"
+    print(f"[3/3] Menganalisis Top {jumlah_clip} momen terbaik + Typography Plan menggunakan {provider_label}...")
 
     prompt = f"""
 Kamu adalah Art Director, Editor Video, dan Strategist Metadata Short-Form Content untuk TikTok, Reels, dan YouTube Shorts.
@@ -565,15 +467,9 @@ Transkrip:
         },
     }
 
-    client = genai.Client(
-        api_key=cfg.api_key_gemini,
-        http_options=types.HttpOptions(
-            timeout=REQUEST_TIMEOUT_MS,
-            retry_options=types.HttpRetryOptions(attempts=1),
-        ),
-    )
+    client = build_client(cfg)
 
-    gemini_config = types.GenerateContentConfig(
+    ai_config = types.GenerateContentConfig(
         response_mime_type="application/json",
         response_schema={
             "type": "ARRAY",
@@ -617,10 +513,10 @@ Transkrip:
 
     hasil_json = _generate_json_with_retry(
         client=client,
-        model=cfg.gemini_model,
-        fallback_model=getattr(cfg, "gemini_fallback_model", None),
+        model=cfg.ai_model,
+        fallback_model=getattr(cfg, "ai_fallback_model", None),
         contents=prompt,
-        config=gemini_config,
+        config=ai_config,
     )
 
     return hasil_json

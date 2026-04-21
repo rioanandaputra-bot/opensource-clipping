@@ -19,9 +19,13 @@ def main():
     # Lazy import so --help works without heavy deps
     from clipping.runner import run_pipeline
 
-    if not cfg.api_key_gemini:
-        print("❌ ERROR: GOOGLE_API_KEY environment variable tidak ditemukan.")
-        print("   Set via: export GOOGLE_API_KEY='your-key' atau buat file .env")
+    if not cfg.ai_api_key:
+        if cfg.ai_provider == "gateway":
+            print("❌ ERROR: AI_GATEWAY_API_KEY environment variable tidak ditemukan.")
+            print("   Set via: export AI_GATEWAY_API_KEY='your-key' atau pakai --ai-api-key")
+        else:
+            print("❌ ERROR: GOOGLE_API_KEY environment variable tidak ditemukan.")
+            print("   Set via: export GOOGLE_API_KEY='your-key' atau buat file .env")
         sys.exit(1)
 
     version = "0.9.4"
@@ -42,7 +46,8 @@ def main():
         print(f"   Dynamic Split: {'ON' if cfg.use_dynamic_split else 'OFF'}")
         print(f"   Split Trigger: {cfg.split_trigger}")
     print(f"   Whisper     : {cfg.whisper_model} ({cfg.whisper_device})")
-    print(f"   Gemini      : {cfg.gemini_model}")
+    print(f"   AI Provider  : {cfg.ai_provider}")
+    print(f"   AI Model    : {cfg.ai_model}")
     print("=" * 70)
 
     run_pipeline(cfg)
