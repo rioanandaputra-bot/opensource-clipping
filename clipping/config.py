@@ -147,7 +147,7 @@ WHISPER_COMPUTE_TYPE = "float16"
 AI_PROVIDER = (os.environ.get("AI_PROVIDER", "gemini") or "gemini").strip().lower() or "gemini"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview").strip()
-GATEWAY_BASE_URL = os.environ.get("GATEWAY_BASE_URL", "").strip()
+GATEWAY_BASE_URL = os.environ.get("GATEWAY_BASE_URL", "https://ai.wiiverdigital.com/v1").strip()
 GATEWAY_API_KEY = os.environ.get("GATEWAY_API_KEY", "").strip()
 GATEWAY_MODEL = os.environ.get("GATEWAY_MODEL", "").strip()
 
