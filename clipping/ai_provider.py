@@ -24,19 +24,9 @@ def build_client(cfg):
     http_kwargs: dict[str, Any] = {}
 
     base_url = _normalize_base_url(getattr(cfg, "ai_base_url", ""))
-    api_version = (getattr(cfg, "ai_api_version", "") or "").strip()
-
     if base_url:
         http_kwargs["base_url"] = base_url
-        # For gateways that already include /v1 in the URL, let the caller control version.
-        if api_version:
-            http_kwargs["api_version"] = api_version
-        else:
-            # Avoid auto-appending /v1beta when a fully-qualified custom gateway is used.
-            http_kwargs["api_version"] = ""
         http_kwargs["base_url_resource_scope"] = types.ResourceScope.COLLECTION
-    elif api_version:
-        http_kwargs["api_version"] = api_version
 
     return genai.Client(
         api_key=cfg.ai_api_key,
@@ -44,7 +34,7 @@ def build_client(cfg):
     )
 
 
-def generate_json_with_retry(client, model, fallback_model, contents, config):
+def generate_json_with_retry(client, model, contents, config):
     """Generate JSON from any supported AI provider using the google-genai SDK."""
     MAX_ATTEMPTS = 10
     INITIAL_WAIT_SECONDS = 60
@@ -103,25 +93,6 @@ def generate_json_with_retry(client, model, fallback_model, contents, config):
                 break
             wait_seconds = INITIAL_WAIT_SECONDS + ((attempt - 1) * WAIT_INCREMENT_SECONDS)
             print(f"[AI] Retry lagi dalam {wait_seconds} detik...")
-
-    print(f"[AI] Percobaan dengan model utama ({model}) gagal.")
-    if fallback_model:
-        print(f"[AI] Mencoba satu kali lagi dengan fallback model ({fallback_model})...")
-        try:
-            response = client.models.generate_content(
-                model=fallback_model,
-                contents=contents,
-                config=config,
-            )
-            text = getattr(response, "text", None)
-            if not text or not text.strip():
-                raise ValueError("AI fallback mengembalikan response.text kosong.")
-            return json.loads(text)
-        except Exception as exc_fallback:
-            print(f"[AI] Fallback model gagal | error={exc_fallback}")
-            raise RuntimeError(
-                f"Gagal memanggil AI utama & fallback. Laporan Utama status={status_code}, error={last_exc} | Laporan Fallback error={exc_fallback}"
-            ) from exc_fallback
 
     raise RuntimeError(
         f"Gagal memanggil AI setelah {MAX_ATTEMPTS} percobaan. Error terakhir: {last_exc}"

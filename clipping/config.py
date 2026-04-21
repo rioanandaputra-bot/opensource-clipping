@@ -144,11 +144,12 @@ WHISPER_DEVICE = "cuda"
 WHISPER_COMPUTE_TYPE = "float16"
 
 # AI Provider
-AI_PROVIDER = "gemini"
-AI_BASE_URL = os.environ.get("AI_GATEWAY_BASE_URL", "").strip()
-AI_API_VERSION = os.environ.get("AI_GATEWAY_API_VERSION", "").strip()
-AI_MODEL = os.environ.get("AI_MODEL", "gemini-3-flash-preview").strip()
-AI_FALLBACK_MODEL = os.environ.get("AI_FALLBACK_MODEL", "gemini-2.5-flash").strip()
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "gemini").strip().lower() or "gemini"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview").strip()
+GATEWAY_BASE_URL = os.environ.get("GATEWAY_BASE_URL", "").strip()
+GATEWAY_API_KEY = os.environ.get("GATEWAY_API_KEY", "").strip()
+GATEWAY_MODEL = os.environ.get("GATEWAY_MODEL", "").strip()
 
 
 # ==============================================================================
@@ -314,32 +315,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--ai-base-url",
-        default=AI_BASE_URL,
+        default="",
         help="Custom AI gateway base URL (used when --ai-provider gateway)",
     )
     p.add_argument(
-        "--ai-api-version",
-        default=AI_API_VERSION,
-        help="API version sent to the AI provider. Leave empty for gateways that already include /v1 in base URL.",
-    )
-    p.add_argument(
         "--ai-api-key",
-        default=os.environ.get("AI_GATEWAY_API_KEY", "").strip(),
-        help="API key for the selected AI provider (gateway key or Gemini key if you prefer overriding env)",
+        default="",
+        help="API key for the selected AI provider",
     )
     p.add_argument(
         "--ai-model",
-        "--gemini-model",
-        dest="ai_model",
-        default=AI_MODEL,
-        help="AI model name (works for both Gemini and gateway mode)",
-    )
-    p.add_argument(
-        "--ai-fallback-model",
-        "--gemini-fallback-model",
-        dest="ai_fallback_model",
-        default=AI_FALLBACK_MODEL,
-        help="Fallback model name if the main AI model fails",
+        dest="ai_model_flag",
+        default="",
+        help="AI model name to use for the selected provider",
     )
     p.add_argument(
         "--load-gemini-json",
@@ -462,14 +450,21 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
             os.path.join(base_dir, f"face_yolov{args.yolo_size}.pt")
         ),
         # API keys (from env)
-        api_key_ai=args.ai_api_key or os.environ.get("GOOGLE_API_KEY", ""),
-        api_key_gemini=args.ai_api_key or os.environ.get("GOOGLE_API_KEY", ""),
+        api_key_ai=(
+            args.ai_api_key
+            or (GEMINI_API_KEY if args.ai_provider == "gemini" else GATEWAY_API_KEY)
+        ),
+        api_key_gemini=GEMINI_API_KEY,
         hf_token=os.environ.get("HF_TOKEN", ""),
         pexels_api_key=os.environ.get("PEXELS_API_KEY", ""),
         ai_provider=args.ai_provider,
-        ai_base_url=args.ai_base_url,
-        ai_api_version=args.ai_api_version,
-        ai_api_key=args.ai_api_key or os.environ.get("GOOGLE_API_KEY", ""),
+        ai_base_url=(args.ai_base_url or (GATEWAY_BASE_URL if args.ai_provider == "gateway" else "")),
+        ai_api_key=(
+            args.ai_api_key
+            or (GEMINI_API_KEY if args.ai_provider == "gemini" else GATEWAY_API_KEY)
+        ),
+        gemini_api_key=GEMINI_API_KEY,
+        gateway_api_key=GATEWAY_API_KEY,
         # Pengaturan utama
         url_youtube=args.url,
         jumlah_clip=args.clips,
@@ -518,10 +513,9 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         whisper_device=args.whisper_device,
         whisper_compute_type=args.whisper_compute_type,
         # AI
-        ai_model=args.ai_model,
-        ai_fallback_model=args.ai_fallback_model,
-        gemini_model=args.ai_model,
-        gemini_fallback_model=args.ai_fallback_model,
+        ai_model=args.ai_model_flag or (GEMINI_MODEL if args.ai_provider == "gemini" else GATEWAY_MODEL),
+        gemini_model=GEMINI_MODEL,
+        gateway_model=GATEWAY_MODEL,
         load_gemini_json=args.load_gemini_json,
         # Tracking Tuning
         track_step=args.track_step,

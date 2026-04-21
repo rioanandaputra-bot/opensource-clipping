@@ -21,11 +21,11 @@ def main():
 
     if not cfg.ai_api_key:
         if cfg.ai_provider == "gateway":
-            print("❌ ERROR: AI_GATEWAY_API_KEY environment variable tidak ditemukan.")
-            print("   Set via: export AI_GATEWAY_API_KEY='your-key' atau pakai --ai-api-key")
+            print("❌ ERROR: GATEWAY_API_KEY environment variable tidak ditemukan.")
+            print("   Set via: export GATEWAY_API_KEY='your-key' atau pakai --ai-api-key")
         else:
-            print("❌ ERROR: GOOGLE_API_KEY environment variable tidak ditemukan.")
-            print("   Set via: export GOOGLE_API_KEY='your-key' atau buat file .env")
+            print("❌ ERROR: GEMINI_API_KEY environment variable tidak ditemukan.")
+            print("   Set via: export GEMINI_API_KEY='your-key' atau buat file .env")
         sys.exit(1)
 
     version = "0.9.4"

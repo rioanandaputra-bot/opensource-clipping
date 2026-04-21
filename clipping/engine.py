@@ -246,15 +246,13 @@ def analyze_with_ai(
     transkrip_lengkap : str
         The full transcript text.
     cfg : SimpleNamespace
-        Config object (must have api_key_gemini, jumlah_clip, durasi_hook, gemini_model).
+        Config object (must have ai_api_key, ai_provider, ai_model, jumlah_clip, durasi_hook).
 
     Returns
     -------
     list[dict]
         List of clip dicts parsed from Gemini JSON response.
     """
-    from google.genai import types
-
     jumlah_clip = cfg.jumlah_clip
     durasi_hook = cfg.durasi_hook
 
@@ -469,9 +467,9 @@ Transkrip:
 
     client = build_client(cfg)
 
-    ai_config = types.GenerateContentConfig(
-        response_mime_type="application/json",
-        response_schema={
+    ai_config = {
+        "response_mime_type": "application/json",
+        "response_schema": {
             "type": "ARRAY",
             "items": {
                 "type": "OBJECT",
@@ -509,12 +507,11 @@ Transkrip:
                 ],
             },
         },
-    )
+    }
 
-    hasil_json = _generate_json_with_retry(
+    hasil_json = generate_json_with_retry(
         client=client,
         model=cfg.ai_model,
-        fallback_model=getattr(cfg, "ai_fallback_model", None),
         contents=prompt,
         config=ai_config,
     )
