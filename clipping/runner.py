@@ -74,7 +74,7 @@ def run_pipeline(cfg) -> list[dict]:
     # Step 3 — AI analysis
     ai_output_path = os.path.join(cfg.outputs_dir, "ai_response.json")
     
-    if getattr(cfg, "load_gemini_json", False) and os.path.exists(ai_output_path):
+    if getattr(cfg, "load_ai_json", False) and os.path.exists(ai_output_path):
         print(f"\n🔄 [3/3] Memuat data AI ({cfg.ai_model}) dari file lokal: {ai_output_path}")
         with open(ai_output_path, "r", encoding="utf-8") as f:
             hasil_json = json.load(f)
