@@ -11,7 +11,7 @@
 | Feature | Description |
 |---|---|
 | **AI Transcriber** | Word-level transcription using **Faster-Whisper** (large-v3) |
-| **AI Content Curator** | **Google Gemini** analyzes context, picks the most viral moments, and generates metadata |
+| **AI Content Curator** | AI provider analyzes context, picks the most viral moments, and generates metadata |
 | **Smart Auto-Framing** | Face-tracking via **[MediaPipe BlazeFace (Full-Range)](https://ai.google.dev/edge/mediapipe/solutions/vision/face_detector)** with Smooth Pan, Deadzone & anti-jitter algorithms |
 | **Cinematic Teaser Hook** | 3-second hook with dark overlay, cinematic bars, and **TV Glitch** transition |
 | **Karaoke Subtitles** | Word-by-word highlighted `.ASS` subtitles (Alex Hormozi / Veed style) |
@@ -29,7 +29,7 @@
 - **Python** 3.10+
 - **FFmpeg** installed and available in PATH
 - **CUDA GPU** recommended (for Whisper; CPU fallback available)
-- **Google Gemini API Key** ([get one here](https://aistudio.google.com/apikey))
+- **AI provider API key** (Gemini or custom gateway)
 - **Pexels API Key** (optional, for B-roll — [get one here](https://www.pexels.com/api/))
 - **HuggingFace Token** (optional, for split-screen / camera-switch — [get one here](https://huggingface.co/settings/tokens), requires accepting [Pyannote model agreement](https://huggingface.co/pyannote/speaker-diarization-3.1))
 
@@ -52,9 +52,9 @@ from pathlib import Path
 from google.colab import userdata
 
 # Store your keys in Colab Secrets first!
-GOOGLE_API_KEY = userdata.get("GOOGLE_API_KEY")
+GEMINI_API_KEY = userdata.get("GEMINI_API_KEY")
 
-env_text = f"GOOGLE_API_KEY={GOOGLE_API_KEY}\n"
+env_text = f"GEMINI_API_KEY={GEMINI_API_KEY}\n"
 Path(".env").write_text(env_text, encoding="utf-8")
 ```
 
@@ -75,7 +75,7 @@ WHISPER_COMPUTE_TYPE = "float32"
   --font-style "{FONT_STYLE}" \
   --hook-duration 3 \
   --words-per-sub 5 \
-  --gemini-model "{GEMINI_MODEL}" \
+  --ai-model "{GEMINI_MODEL}" \
   --whisper-compute-type "{WHISPER_COMPUTE_TYPE}" \
   --no-bgm
 ```
@@ -97,7 +97,7 @@ pip install -r requirements.txt          # pip / Colab
 
 # 3. Set up API keys
 cp .env.sample .env
-# Edit .env and add your GOOGLE_API_KEY
+# Edit .env and add your GEMINI_API_KEY or GATEWAY_API_KEY
 
 # 4. Run (Must include --url)
 python main.py --url "https://youtube.com/watch?v=VIDEO_ID"
@@ -171,9 +171,9 @@ python main.py --help
 | `--whisper-model` | `large-v3` | Whisper model size ([see here](https://github.com/SYSTRAN/faster-whisper?tab=readme-ov-file#whisper) for options) |
 | `--whisper-device` | `cuda` | Whisper device (`cuda`, `cpu`, `auto`) |
 | `--whisper-compute-type` | `float16` | Compute type for Whisper (`float16`, `int8`, etc.) |
-| `--gemini-model` | `gemini-3-flash-preview` | Gemini model name |
-| `--gemini-fallback-model` | `gemini-2.5-flash` | Gemini fallback model name if main model fails |
-| `--load-gemini-json` | `False` | Load the saved `gemini_response.json` from the output directory to bypass the Gemini API call |
+| `--ai-provider` | `gemini` | AI provider selection: `gemini` or `gateway` |
+| `--ai-model` | `gemini-3-flash-preview` | AI model name |
+| `--load-gemini-json` | `False` | Load the saved `ai_response.json` from the output directory to bypass the AI call |
 | `--split-screen` | `False` | Enable split-screen mode for podcasts (9:16 only, requires `HF_TOKEN`). Supports 3+ speakers across multiple scenes |
 | `--dynamic-split` | `False` | Automatically switch between full-screen and split-screen based on activity (requires `--split-screen`) |
 | `--split-trigger` | `diarization` | Trigger for splitting: `diarization` (audio-based) or `face` (visual count) |
@@ -267,7 +267,7 @@ GEMINI_MODEL = "gemini-2.0-flash"
   --hook-duration 3 \
   --words-per-sub 5 \
   --face-detector yolo \
-  --gemini-model "{GEMINI_MODEL}" \
+  --ai-model "{GEMINI_MODEL}" \
   --no-bgm \
   --no-subs \
   --no-broll \
@@ -291,7 +291,7 @@ GEMINI_MODEL = "gemini-2.0-flash"
   --font-style "{FONT_STYLE}" \
   --hook-duration 3 \
   --words-per-sub 5 \
-  --gemini-model "{GEMINI_MODEL}" \
+  --ai-model "{GEMINI_MODEL}" \
   --no-bgm \
   --no-subs \
   --no-broll \
@@ -316,7 +316,7 @@ opensource-clipping/
 ├── clipping/
 │   ├── __init__.py
 │   ├── config.py            # Master configuration & argparse
-│   ├── engine.py            # Download → Transcribe → Gemini AI
+│   ├── engine.py            # Download → Transcribe → AI analysis
 │   ├── diarization.py       # Pyannote speaker diarization (split-screen & camera-switch)
 │   ├── metadata.py          # QA metadata normalization
 │   ├── studio.py            # Video render engine (face-track, split-screen, camera-switch, subs, B-roll, BGM)
@@ -332,7 +332,7 @@ opensource-clipping/
 graph LR
     A[YouTube URL] --> B[Download Video]
     B --> C[Whisper Transcription]
-    C --> D[Gemini AI Analysis]
+    C --> D[AI Analysis]
     D --> E[Metadata QA]
     E --> F[Render Loop]
     F --> G[Face-Track Crop]
@@ -351,7 +351,7 @@ For each clip, the pipeline creates an `outputs/` directory and generates:
 | `outputs/highlight_rank_N_ready.mp4` | Final rendered clip with subtitles, B-roll, BGM |
 | `outputs/thumbnail_rank_N.jpg` | Auto-generated thumbnail with title text |
 | `outputs/render_manifest.json` | Manifest with metadata for all clips |
-| `outputs/metadata_preview.json` | Gemini-generated metadata (titles, tags, captions) |
+| `outputs/metadata_preview.json` | AI-generated metadata (titles, tags, captions) |
 
 ## 🎵 Font Styles
 

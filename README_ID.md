@@ -11,7 +11,7 @@
 | Fitur | Deskripsi |
 |---|---|
 | **AI Transcriber** | Transkripsi per-kata dengan akurasi tinggi menggunakan **Faster-Whisper** (large-v3) |
-| **AI Content Curator** | **Google Gemini** menganalisis konteks, memilih momen paling viral, dan membuat metadata |
+| **AI Content Curator** | AI provider menganalisis konteks, memilih momen paling viral, dan membuat metadata |
 | **Smart Auto-Framing** | Pelacakan wajah via **[MediaPipe BlazeFace (Full-Range)](https://ai.google.dev/edge/mediapipe/solutions/vision/face_detector)** dengan algoritma Smooth Pan, Deadzone & anti-jitter |
 | **Cinematic Teaser Hook** | Hook 3 detik dengan overlay gelap, cinematic bars, dan transisi **TV Glitch** |
 | **Karaoke Subtitles** | Subtitle `.ASS` yang menyala per-kata (gaya Alex Hormozi / Veed) |
@@ -29,7 +29,7 @@
 - **Python** 3.10+
 - **FFmpeg** terinstall dan tersedia di PATH
 - **GPU CUDA** disarankan (untuk Whisper; bisa fallback ke CPU)
-- **Google Gemini API Key** ([dapatkan di sini](https://aistudio.google.com/apikey))
+- **API key AI provider** (Gemini atau gateway custom)
 - **Pexels API Key** (opsional, untuk B-roll — [dapatkan di sini](https://www.pexels.com/api/))
 - **HuggingFace Token** (opsional, untuk split-screen / camera-switch — [dapatkan di sini](https://huggingface.co/settings/tokens), perlu accept [Pyannote model agreement](https://huggingface.co/pyannote/speaker-diarization-3.1))
 
@@ -51,10 +51,10 @@ import os
 from pathlib import Path
 from google.colab import userdata
 
-# Daftarkan GOOGLE_API_KEY di menu Secrets Colab (ikon kunci)
-GOOGLE_API_KEY = userdata.get("GOOGLE_API_KEY")
+# Daftarkan GEMINI_API_KEY di menu Secrets Colab (ikon kunci)
+GEMINI_API_KEY = userdata.get("GEMINI_API_KEY")
 
-env_text = f"GOOGLE_API_KEY={GOOGLE_API_KEY}\n"
+env_text = f"GEMINI_API_KEY={GEMINI_API_KEY}\n"
 Path(".env").write_text(env_text, encoding="utf-8")
 ```
 
@@ -75,7 +75,7 @@ WHISPER_COMPUTE_TYPE = "float32"
   --font-style "{FONT_STYLE}" \
   --hook-duration 3 \
   --words-per-sub 5 \
-  --gemini-model "{GEMINI_MODEL}" \
+  --ai-model "{GEMINI_MODEL}" \
   --whisper-compute-type "{WHISPER_COMPUTE_TYPE}" \
   --no-bgm
 ```
@@ -97,7 +97,7 @@ pip install -r requirements.txt          # pip / Colab
 
 # 3. Setup API key
 cp .env.sample .env
-# Edit file .env dan masukkan GOOGLE_API_KEY kamu
+# Edit file .env dan masukkan GEMINI_API_KEY atau GATEWAY_API_KEY kamu
 
 # 4. Jalankan (Wajib sertakan --url)
 python main.py --url "https://youtube.com/watch?v=VIDEO_ID"
@@ -171,9 +171,9 @@ python main.py --help
 | `--whisper-model` | `large-v3` | Ukuran model Whisper ([lihat daftar model](https://github.com/SYSTRAN/faster-whisper?tab=readme-ov-file#whisper)) |
 | `--whisper-device` | `cuda` | Device Whisper (`cuda`, `cpu`, `auto`) |
 | `--whisper-compute-type` | `float16` | Tipe komputasi Whisper (`float16`, `int8`, dll) |
-| `--gemini-model` | `gemini-3-flash-preview` | Nama model Gemini |
-| `--gemini-fallback-model` | `gemini-2.5-flash` | Nama model fallback Gemini jika model utama gagal |
-| `--load-gemini-json` | `False` | Memuat file `gemini_response.json` dari folder output untuk melewati pemanggilan API Gemini AI (berguna untuk reproduksi/debug) |
+| `--ai-provider` | `gemini` | Pilih provider AI: `gemini` atau `gateway` |
+| `--ai-model` | `gemini-3-flash-preview` | Nama model AI |
+| `--load-gemini-json` | `False` | Memuat file `ai_response.json` dari folder output untuk melewati pemanggilan AI (berguna untuk reproduksi/debug) |
 | `--split-screen` | `False` | Aktifkan mode split-screen untuk podcast (hanya 9:16, butuh `HF_TOKEN`). Mendukung 3+ speaker lintas scene |
 | `--diarization-speakers` | `auto` | Jumlah speaker untuk diarization (set ke `3` untuk fix 3 orang, atau `auto` untuk deteksi visual AI otomatis) |
 | `--camera-switch` | `False` | Aktifkan mode camera-switch untuk podcast — crop full 9:16 berpindah ke speaker aktif; blurred pillarbox saat kedua speaker bicara bersamaan (hanya 9:16, butuh `HF_TOKEN`) |
@@ -257,7 +257,7 @@ opensource-clipping/
 ├── clipping/
 │   ├── __init__.py
 │   ├── config.py            # Konfigurasi master & argparse
-│   ├── engine.py            # Download → Transkripsi → Gemini AI
+│   ├── engine.py            # Download → Transkripsi → AI analysis
 │   ├── diarization.py       # Pyannote speaker diarization (split-screen & camera-switch)
 │   ├── metadata.py          # Normalisasi & QA metadata
 │   ├── studio.py            # Mesin render video (face-track, split-screen, camera-switch, subs, B-roll, BGM)
@@ -273,7 +273,7 @@ opensource-clipping/
 graph LR
     A[URL YouTube] --> B[Download Video]
     B --> C[Transkripsi Whisper]
-    C --> D[Analisis Gemini AI]
+    C --> D[Analisis AI]
     D --> E[QA Metadata]
     E --> F[Loop Render]
     F --> G[Crop Face-Track]
@@ -292,7 +292,7 @@ Untuk setiap klip, pipeline akan membuat folder `outputs/` dan menghasilkan:
 | `outputs/highlight_rank_N_ready.mp4` | Klip final dengan subtitle, B-roll, BGM |
 | `outputs/thumbnail_rank_N.jpg` | Thumbnail otomatis dengan teks judul |
 | `outputs/render_manifest.json` | Manifest berisi metadata semua klip |
-| `outputs/metadata_preview.json` | Metadata dari Gemini (judul, tag, caption) |
+| `outputs/metadata_preview.json` | Metadata dari AI (judul, tag, caption) |
 
 ## 🎵 Gaya Font
 
@@ -387,7 +387,7 @@ GEMINI_MODEL = "gemini-2.0-flash"
   --hook-duration 3 \
   --words-per-sub 5 \
   --face-detector yolo \
-  --gemini-model "{GEMINI_MODEL}" \
+  --ai-model "{GEMINI_MODEL}" \
   --no-bgm \
   --no-subs \
   --no-broll \
@@ -411,7 +411,7 @@ GEMINI_MODEL = "gemini-2.0-flash"
   --font-style "{FONT_STYLE}" \
   --hook-duration 3 \
   --words-per-sub 5 \
-  --gemini-model "{GEMINI_MODEL}" \
+  --ai-model "{GEMINI_MODEL}" \
   --no-bgm \
   --no-subs \
   --no-broll \

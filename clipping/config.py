@@ -306,12 +306,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Compute type for Whisper (float16, int8, etc.)",
     )
 
-    # --- AI Gateway / Gemini & Face Detection ---
+    # --- AI Provider & Face Detection ---
     p.add_argument(
         "--ai-provider",
         choices=["gemini", "gateway"],
         default=AI_PROVIDER,
-        help="AI provider selection: gemini (Google Gemini API) or gateway (custom OpenAI-compatible /v1 gateway)",
+        help="AI provider selection: gemini or gateway",
     )
     p.add_argument(
         "--ai-base-url",
@@ -332,7 +332,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--load-gemini-json",
         action="store_true",
-        help="Load the saved gemini_response.json from outputs dir to bypass the AI generation step (useful for debugging)",
+        help="Load the saved ai_response.json from outputs dir to bypass the AI generation step (useful for debugging)",
     )
     p.add_argument(
         "--box-face-detection",

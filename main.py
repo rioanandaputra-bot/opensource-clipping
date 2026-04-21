@@ -46,7 +46,7 @@ def main():
         print(f"   Dynamic Split: {'ON' if cfg.use_dynamic_split else 'OFF'}")
         print(f"   Split Trigger: {cfg.split_trigger}")
     print(f"   Whisper     : {cfg.whisper_model} ({cfg.whisper_device})")
-    print(f"   AI Provider  : {cfg.ai_provider}")
+    print(f"   AI Provider : {cfg.ai_provider}")
     print(f"   AI Model    : {cfg.ai_model}")
     print("=" * 70)
 

@@ -1,5 +1,5 @@
 """
-clipping.engine — Download, Transcription & Gemini AI Analysis
+clipping.engine — Download, Transcription & AI Analysis
 
 Maps to Cell 2 (The Engine) of the notebook.
 """
@@ -239,7 +239,7 @@ def analyze_with_ai(
     cfg,
 ) -> list[dict]:
     """
-    Analyse transcript with Gemini AI to pick best clip moments.
+    Analyse transcript with AI to pick best clip moments.
 
     Parameters
     ----------
@@ -251,7 +251,7 @@ def analyze_with_ai(
     Returns
     -------
     list[dict]
-        List of clip dicts parsed from Gemini JSON response.
+        List of clip dicts parsed from AI JSON response.
     """
     jumlah_clip = cfg.jumlah_clip
     durasi_hook = cfg.durasi_hook
