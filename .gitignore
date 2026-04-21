@@ -26,3 +26,8 @@ metadata_preview.json
 credentials.json
 youtube_token.json
 .credentials/
+
+# Local-only artifacts from test runs
+cookies.txt
+face_yolov8m.pt
+Montserrat-Black.ttf
