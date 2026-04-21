@@ -173,7 +173,6 @@ python main.py --help
 | `--whisper-compute-type` | `float16` | Compute type for Whisper (`float16`, `int8`, etc.) |
 | `--ai-provider` | `gemini` | AI provider selection: `gemini` or `gateway` |
 | `--ai-model` | `gemini-3-flash-preview` | AI model name |
-| `--load-ai-json` | `False` | Load the saved `ai_response.json` from the output directory to bypass the AI call |
 | `--split-screen` | `False` | Enable split-screen mode for podcasts (9:16 only, requires `HF_TOKEN`). Supports 3+ speakers across multiple scenes |
 | `--dynamic-split` | `False` | Automatically switch between full-screen and split-screen based on activity (requires `--split-screen`) |
 | `--split-trigger` | `diarization` | Trigger for splitting: `diarization` (audio-based) or `face` (visual count) |

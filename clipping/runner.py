@@ -72,19 +72,7 @@ def run_pipeline(cfg) -> list[dict]:
         )
 
     # Step 3 — AI analysis
-    ai_output_path = os.path.join(cfg.outputs_dir, "ai_response.json")
-    
-    if getattr(cfg, "load_ai_json", False) and os.path.exists(ai_output_path):
-        print(f"\n🔄 [3/3] Memuat data AI ({cfg.ai_model}) dari file lokal: {ai_output_path}")
-        with open(ai_output_path, "r", encoding="utf-8") as f:
-            hasil_json = json.load(f)
-    else:
-        hasil_json = engine.analyze_with_ai(transkrip_lengkap, cfg)
-        
-        # Save raw AI json for future loading/reproduction
-        with open(ai_output_path, "w", encoding="utf-8") as f:
-            json.dump(hasil_json, f, indent=4, ensure_ascii=False)
-        print(f"💾 Raw AI response tersimpan di: {ai_output_path}")
+    hasil_json = engine.analyze_with_ai(transkrip_lengkap, cfg)
 
     # Step 4 — Metadata normalisation
     hasil_json = metadata.normalize_and_validate(hasil_json)

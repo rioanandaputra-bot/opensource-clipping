@@ -342,11 +342,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="AI model name to use for the selected provider",
     )
     p.add_argument(
-        "--load-ai-json",
-        action="store_true",
-        help="Load the saved ai_response.json from outputs dir to bypass the AI generation step (useful for debugging)",
-    )
-    p.add_argument(
         "--box-face-detection",
         action="store_true",
         help="Draw a yellow bounding box around the detected face for debugging/tracking visualization",
@@ -528,7 +523,6 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         ai_model=args.ai_model_flag or (GEMINI_MODEL if args.ai_provider == "gemini" else GATEWAY_MODEL),
         gemini_model=GEMINI_MODEL,
         gateway_model=GATEWAY_MODEL,
-        load_ai_json=args.load_ai_json,
         # Tracking Tuning
         track_step=args.track_step,
         track_deadzone=args.track_deadzone,
