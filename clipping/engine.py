@@ -183,6 +183,7 @@ def transcribe_video(
     model_size: str = "large-v3",
     device: str = "cuda",
     compute_type: str = "float16",
+    cfg=None,
 ) -> tuple[str, list[dict]]:
     """
     Transcribe *video_path* using Faster-Whisper.
@@ -197,7 +198,22 @@ def transcribe_video(
     print("[2/3] Memulai transkripsi dengan Faster-Whisper (Level Per-Kata)...")
 
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
-    segments, _info = model.transcribe(video_path, beam_size=5, word_timestamps=True)
+    transcribe_kwargs = {
+        "beam_size": getattr(cfg, "whisper_beam_size", 5),
+        "word_timestamps": True,
+        "vad_filter": getattr(cfg, "whisper_vad_filter", True),
+        "condition_on_previous_text": getattr(cfg, "whisper_condition_on_previous_text", False),
+    }
+    batch_size = getattr(cfg, "whisper_batch_size", 8)
+    try:
+        segments, _info = model.transcribe(video_path, batch_size=batch_size, **transcribe_kwargs)
+    except TypeError:
+        # Backward compatibility for environments / versions where some args are unsupported.
+        safe_kwargs = {
+            "beam_size": transcribe_kwargs["beam_size"],
+            "word_timestamps": True,
+        }
+        segments, _info = model.transcribe(video_path, **safe_kwargs)
 
     transkrip_lengkap = ""
     data_segmen: list[dict] = []

@@ -171,6 +171,10 @@ python main.py --help
 | `--whisper-model` | `large-v3` | Whisper model size ([see here](https://github.com/SYSTRAN/faster-whisper?tab=readme-ov-file#whisper) for options) |
 | `--whisper-device` | `cuda` | Whisper device (`cuda`, `cpu`, `auto`) |
 | `--whisper-compute-type` | `float16` | Compute type for Whisper (`float16`, `int8`, etc.) |
+| `--whisper-beam-size` | `5` | Beam size for Whisper decoding |
+| `--whisper-batch-size` | `8` | Faster-Whisper batch size (higher throughput, more RAM) |
+| `--whisper-vad-filter` | `True` | Enable/disable VAD filtering during transcription |
+| `--whisper-condition-on-previous-text` | `False` | Condition decoding on previous text |
 | `--ai-provider` | `gemini` | AI provider selection: `gemini` or `gateway` |
 | `--ai-model` | `gemini-3-flash-preview` | AI model name |
 | `--split-screen` | `False` | Enable split-screen mode for podcasts (9:16 only, requires `HF_TOKEN`). Supports 3+ speakers across multiple scenes |

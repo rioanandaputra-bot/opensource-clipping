@@ -42,6 +42,7 @@ def run_pipeline(cfg) -> list[dict]:
     # Step 2 — Transcribe
     transkrip_lengkap = ""
     data_segmen = []
+    cfg.source_video_dims = None
 
     import glob
 
@@ -69,6 +70,7 @@ def run_pipeline(cfg) -> list[dict]:
             model_size=cfg.whisper_model,
             device=cfg.whisper_device,
             compute_type=cfg.whisper_compute_type,
+            cfg=cfg,
         )
 
     # Step 3 — AI analysis
@@ -126,6 +128,7 @@ def run_pipeline(cfg) -> list[dict]:
 
     # Step 6 — Video encoder & glitch
     video_encoder = studio.detect_video_encoder()
+    cfg.video_encoder = video_encoder
 
     file_glitch_ts = None
     if cfg.use_hook_glitch:

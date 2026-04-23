@@ -171,6 +171,10 @@ python main.py --help
 | `--whisper-model` | `large-v3` | Ukuran model Whisper ([lihat daftar model](https://github.com/SYSTRAN/faster-whisper?tab=readme-ov-file#whisper)) |
 | `--whisper-device` | `cuda` | Device Whisper (`cuda`, `cpu`, `auto`) |
 | `--whisper-compute-type` | `float16` | Tipe komputasi Whisper (`float16`, `int8`, dll) |
+| `--whisper-beam-size` | `5` | Beam size untuk decoding Whisper |
+| `--whisper-batch-size` | `8` | Ukuran batch Faster-Whisper (throughput lebih tinggi, RAM lebih besar) |
+| `--whisper-vad-filter` | `True` | Aktif/nonaktif filter VAD saat transkripsi |
+| `--whisper-condition-on-previous-text` | `False` | Kondisikan decoding pada teks sebelumnya |
 | `--ai-provider` | `gemini` | Pilih provider AI: `gemini` atau `gateway` |
 | `--ai-model` | `gemini-3-flash-preview` | Nama model AI |
 | `--split-screen` | `False` | Aktifkan mode split-screen untuk podcast (hanya 9:16, butuh `HF_TOKEN`). Mendukung 3+ speaker lintas scene |

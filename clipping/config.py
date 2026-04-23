@@ -307,6 +307,30 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Compute type for Whisper (float16, int8, etc.)",
     )
     p.add_argument(
+        "--whisper-beam-size",
+        type=int,
+        default=5,
+        help="Beam size for Whisper decoding",
+    )
+    p.add_argument(
+        "--whisper-batch-size",
+        type=int,
+        default=8,
+        help="Batch size for Faster-Whisper transcription (higher = faster throughput, more RAM)",
+    )
+    p.add_argument(
+        "--whisper-vad-filter",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable/disable VAD filtering for Whisper transcription",
+    )
+    p.add_argument(
+        "--whisper-condition-on-previous-text",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Condition Whisper decoding on previous text",
+    )
+    p.add_argument(
         "--face-detector",
         choices=["mediapipe", "yolo"],
         default="mediapipe",
@@ -526,6 +550,10 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         whisper_model=args.whisper_model,
         whisper_device=args.whisper_device,
         whisper_compute_type=args.whisper_compute_type,
+        whisper_beam_size=args.whisper_beam_size,
+        whisper_batch_size=args.whisper_batch_size,
+        whisper_vad_filter=args.whisper_vad_filter,
+        whisper_condition_on_previous_text=args.whisper_condition_on_previous_text,
         # AI
         ai_model=args.ai_model_flag or (GEMINI_MODEL if args.ai_provider == "gemini" else GATEWAY_MODEL),
         ai_timeout_seconds=args.ai_timeout_seconds,

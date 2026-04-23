@@ -11,6 +11,7 @@ import html
 import json
 import math
 import os
+from bisect import bisect_right
 import random
 import re
 import shutil
@@ -738,7 +739,7 @@ def buat_video_hybrid(
     # SNAP_THRESHOLD   = 0.30  # [NEW; NOT USED] Jika wajah lompat > 30% lebar layar, anggap ganti orang (Hard Cut)
     # =======================================================
 
-    video_encoder = detect_video_encoder()
+    video_encoder = getattr(cfg, "video_encoder", None) or detect_video_encoder()
 
     yolo_model = None
     detector = None
@@ -776,6 +777,7 @@ def buat_video_hybrid(
                     "cap": cv2.VideoCapture(br["filepath"]),
                 }
             )
+    broll_caps.sort(key=lambda x: (x["start"], x["end"]))
 
     # FASE 1: DETEKSI WAJAH
     raw_data = []
@@ -866,47 +868,51 @@ def buat_video_hybrid(
 
             smooth_data.append({"time": d["time"], "x": final_x})
 
+    raw_times = [d["time"] for d in raw_data]
+    smooth_times = [d["time"] for d in smooth_data]
+
     def get_box(t):
         if not raw_data:
             return None
-        if t <= raw_data[0]["time"]:
+        if t <= raw_times[0]:
             return raw_data[0]["box"]
-        if t >= raw_data[-1]["time"]:
+        if t >= raw_times[-1]:
             return raw_data[-1]["box"]
 
-        for i in range(len(raw_data) - 1):
-            if raw_data[i]["time"] <= t <= raw_data[i + 1]["time"]:
-                b1 = raw_data[i]["box"]
-                b2 = raw_data[i + 1]["box"]
-                if b1 is None or b2 is None:
-                    return b1 if b1 else b2
-                t1, t2 = raw_data[i]["time"], raw_data[i + 1]["time"]
-                frac = (t - t1) / (t2 - t1)
-                return (
-                    b1[0] + (b2[0] - b1[0]) * frac,
-                    b1[1] + (b2[1] - b1[1]) * frac,
-                    b1[2] + (b2[2] - b1[2]) * frac,
-                    b1[3] + (b2[3] - b1[3]) * frac,
-                )
-        return None
+        idx = bisect_right(raw_times, t)
+        left_idx = max(0, idx - 1)
+        right_idx = min(len(raw_data) - 1, idx)
+        b1 = raw_data[left_idx]["box"]
+        b2 = raw_data[right_idx]["box"]
+        if b1 is None or b2 is None:
+            return b1 if b1 else b2
+        t1, t2 = raw_times[left_idx], raw_times[right_idx]
+        if t2 == t1:
+            return b1
+        frac = (t - t1) / (t2 - t1)
+        return (
+            b1[0] + (b2[0] - b1[0]) * frac,
+            b1[1] + (b2[1] - b1[1]) * frac,
+            b1[2] + (b2[2] - b1[2]) * frac,
+            b1[3] + (b2[3] - b1[3]) * frac,
+        )
 
     def get_x(t):
         if not smooth_data:
             return default_x
-        if t <= smooth_data[0]["time"]:
+        if t <= smooth_times[0]:
             return smooth_data[0]["x"]
-        if t >= smooth_data[-1]["time"]:
+        if t >= smooth_times[-1]:
             return smooth_data[-1]["x"]
 
-        for i in range(len(smooth_data) - 1):
-            if smooth_data[i]["time"] <= t <= smooth_data[i + 1]["time"]:
-                t1, t2 = smooth_data[i]["time"], smooth_data[i + 1]["time"]
-                x1, x2 = smooth_data[i]["x"], smooth_data[i + 1]["x"]
-                if t1 == t2:
-                    return x1
-                return int(x1 + (x2 - x1) * (t - t1) / (t2 - t1))
-
-        return default_x
+        idx = bisect_right(smooth_times, t)
+        left_idx = max(0, idx - 1)
+        right_idx = min(len(smooth_data) - 1, idx)
+        t1, t2 = smooth_times[left_idx], smooth_times[right_idx]
+        x1, x2 = smooth_data[left_idx]["x"], smooth_data[right_idx]["x"]
+        if t2 == t1:
+            return x1
+        return int(x1 + (x2 - x1) * (t - t1) / (t2 - t1))
 
     # FASE 3: RENDER FRAME
     out_w, out_h = (1080, 1920) if rasio == "9:16" else (1920, 1080)
@@ -922,6 +928,10 @@ def buat_video_hybrid(
 
     TRANSITION_DUR = 0.3
     MAX_ZOOM = 1.10
+    scale_x_dev = out_w / width
+    scale_y_dev = out_h / height
+    center_x_dev = out_w / 2
+    center_y_dev = out_h / 2
 
     try:
         cap.set(cv2.CAP_PROP_POS_MSEC, start_clip * 1000)
@@ -930,6 +940,7 @@ def buat_video_hybrid(
 
         print(f"🎬 {label} - Render frame dimulai...", flush=True)
 
+        active_broll_idx = 0
         while True:
             ret, frame_utama = cap.read()
             if not ret:
@@ -940,6 +951,9 @@ def buat_video_hybrid(
                 break
 
             waktu_absolut = start_clip + t
+
+            while active_broll_idx < len(broll_caps) and broll_caps[active_broll_idx]["end"] < waktu_absolut:
+                active_broll_idx += 1
 
             if dev_visualize:
                 # Render full context for dev mode
@@ -952,35 +966,33 @@ def buat_video_hybrid(
                 
                 # Highlight 9:16 window
                 # Current source width/height vs canvas out_w/out_h
-                scale_x = out_w / width
-                cx_scaled = int(cx * scale_x)
-                cw_scaled = int(crop_w * scale_x)
-                
+                cx_scaled = int(cx * scale_x_dev)
+                cw_scaled = int(crop_w * scale_x_dev)
+
                 # Paste bright crop
                 frame_dev[:, cx_scaled : cx_scaled + cw_scaled] = frame_base[:, cx_scaled : cx_scaled + cw_scaled]
-                
+
                 # Draw vertical border lines
                 cv2.line(frame_dev, (cx_scaled, 0), (cx_scaled, out_h), (255, 255, 255), 2)
                 cv2.line(frame_dev, (cx_scaled + cw_scaled, 0), (cx_scaled + cw_scaled, out_h), (255, 255, 255), 2)
-                
+
                 # Draw face box if detected
                 if cfg.box_face_detection or cfg.track_lines or True: # Force in dev mode
                     box = get_box(t)
                     if box:
-                        scale_y = out_h / height
-                        bx1, by1 = int(box[0] * scale_x), int(box[1] * scale_y)
-                        bx2, by2 = int(box[2] * scale_x), int(box[3] * scale_y)
+                        bx1, by1 = int(box[0] * scale_x_dev), int(box[1] * scale_y_dev)
+                        bx2, by2 = int(box[2] * scale_x_dev), int(box[3] * scale_y_dev)
                         cv2.rectangle(frame_dev, (bx1, by1), (bx2, by2), (0, 255, 255), 2)
-                        
+
                         if cfg.track_lines or cfg.dev_mode:
                             # Center points of sides
                             mid_x = (bx1 + bx2) // 2
                             mid_y = (by1 + by2) // 2
-                            
+
                             # Horizontal lines to 9:16 boundaries
                             cv2.line(frame_dev, (cx_scaled, mid_y), (bx1, mid_y), (0, 255, 255), 2)
                             cv2.line(frame_dev, (bx2, mid_y), (cx_scaled + cw_scaled, mid_y), (0, 255, 255), 2)
-                            
+
                             # Vertical lines to frame boundaries (top/bottom)
                             cv2.line(frame_dev, (mid_x, 0), (mid_x, by1), (0, 255, 255), 2)
                             cv2.line(frame_dev, (mid_x, by2), (mid_x, out_h), (0, 255, 255), 2)
@@ -997,7 +1009,8 @@ def buat_video_hybrid(
                 frame_utama_siap = cv2.resize(frame_utama, (out_w, out_h))
                 frame_terpilih = frame_utama_siap
 
-            for bc in broll_caps:
+            if active_broll_idx < len(broll_caps):
+                bc = broll_caps[active_broll_idx]
                 if bc["start"] <= waktu_absolut <= bc["end"]:
                     elapsed_broll = waktu_absolut - bc["start"]
                     bc["cap"].set(cv2.CAP_PROP_POS_MSEC, elapsed_broll * 1000)
@@ -1013,9 +1026,8 @@ def buat_video_hybrid(
                         zoom_factor = 1.0 + ((MAX_ZOOM - 1.0) * progress_broll)
 
                         frame_b_crop = crop_center_broll(frame_b, out_w, out_h)
-                        center_x, center_y = out_w / 2, out_h / 2
                         M = cv2.getRotationMatrix2D(
-                            (center_x, center_y), 0, zoom_factor
+                            (center_x_dev, center_y_dev), 0, zoom_factor
                         )
                         frame_b_zoomed = cv2.warpAffine(frame_b_crop, M, (out_w, out_h))
 
@@ -1031,8 +1043,6 @@ def buat_video_hybrid(
                             frame_terpilih = cv2.addWeighted(
                                 frame_b_zoomed, alpha, frame_utama_siap, 1.0 - alpha, 0
                             )
-
-                    break
 
             writer.stdin.write(frame_terpilih.tobytes())
             frame_count += 1
@@ -1513,7 +1523,7 @@ def buat_video_split_screen(
     INACTIVE_ALPHA = 0.15  # darkening for inactive speaker panel
     ACTIVE_BORDER = 3  # px, highlight border for active speaker
 
-    video_encoder = detect_video_encoder()
+    video_encoder = getattr(cfg, "video_encoder", None) or detect_video_encoder()
 
     # Setup face detector
     yolo_model = None
@@ -1620,6 +1630,8 @@ def buat_video_split_screen(
     solo_counts: dict[str, int] = {spk: 0 for spk in all_speakers_in_clip}
     multi_counts: dict[str, int] = {spk: 0 for spk in all_speakers_in_clip}
     current_time = 0.0
+    diarization_scan_idx = 0
+    diarization_scan_len = len(diarization_data) if diarization_data else 0
     last_detect_percent = -1
 
     def _clamp_x(cx_center: float) -> int:
@@ -1695,8 +1707,15 @@ def buat_video_split_screen(
         face_centers.sort(key=lambda fc: fc[0])  # left → right
         
         if diarization_data:
-            from .diarization import get_active_speakers
-            active_now = get_active_speakers(diarization_data, start_clip + current_time)
+            timestamp_abs = start_clip + current_time
+            while diarization_scan_idx < diarization_scan_len and diarization_data[diarization_scan_idx]["end"] < timestamp_abs:
+                diarization_scan_idx += 1
+            active_now = []
+            for seg in diarization_data[diarization_scan_idx:]:
+                if seg["start"] > timestamp_abs:
+                    break
+                if seg["end"] >= timestamp_abs and seg["speaker"] not in active_now:
+                    active_now.append(seg["speaker"])
         else:
             # Visual-only: base active speakers on face count
             if len(face_centers) == 1:
@@ -1930,6 +1949,8 @@ def buat_video_split_screen(
 
     current_layout = "split"
     current_speaker = None
+    diarization_idx = 0
+    diarization_len = len(diarization_data) if diarization_data else 0
     MIN_HOLD = float(getattr(cfg, "switch_hold_duration", 2.0))
     # Initialize with a large negative time to allow instant layout decision at t=0
     last_switch_time = -MIN_HOLD
@@ -1985,9 +2006,22 @@ def buat_video_split_screen(
             prev_small_gray = curr_small
 
             timestamp_abs = start_clip + t
-            from .diarization import get_active_speakers
-            active_speakers = get_active_speakers(diarization_data, timestamp_abs)
-            active_speaker = get_active_speaker(diarization_data, timestamp_abs)
+            if diarization_data:
+                while diarization_idx < diarization_len and diarization_data[diarization_idx]["end"] < timestamp_abs:
+                    diarization_idx += 1
+                active_speakers = []
+                active_speaker = None
+                for seg in diarization_data[diarization_idx:]:
+                    if seg["start"] > timestamp_abs:
+                        break
+                    if seg["end"] >= timestamp_abs:
+                        if seg["speaker"] not in active_speakers:
+                            active_speakers.append(seg["speaker"])
+                        if active_speaker is None:
+                            active_speaker = seg["speaker"]
+            else:
+                active_speakers = []
+                active_speaker = None
 
             # --- Layout decision logic ---
             if is_dynamic:
@@ -2333,7 +2367,7 @@ def buat_video_camera_switch(
     BLUR_KERNEL = 99
     BLUR_SIGMA = 30
 
-    video_encoder = detect_video_encoder()
+    video_encoder = getattr(cfg, "video_encoder", None) or detect_video_encoder()
 
     # ---------------------------------------------------------------- face detector
     yolo_model = None
@@ -2392,6 +2426,8 @@ def buat_video_camera_switch(
     solo_counts: dict[str, int] = {spk: 0 for spk in speakers}
     multi_counts: dict[str, int] = {spk: 0 for spk in speakers}
     current_time = 0.0
+    diarization_scan_idx = 0
+    diarization_scan_len = len(diarization_data) if diarization_data else 0
     last_detect_percent = -1
 
     def _clamp_x_cs(cx_center: float) -> int:
@@ -2440,7 +2476,18 @@ def buat_video_camera_switch(
                     )
 
         face_centers.sort(key=lambda fc: fc[0])  # left → right
-        active_now = get_active_speakers(diarization_data, start_clip + current_time)
+        if diarization_data:
+            timestamp_abs = start_clip + current_time
+            while diarization_scan_idx < diarization_scan_len and diarization_data[diarization_scan_idx]["end"] < timestamp_abs:
+                diarization_scan_idx += 1
+            active_now = []
+            for seg in diarization_data[diarization_scan_idx:]:
+                if seg["start"] > timestamp_abs:
+                    break
+                if seg["end"] >= timestamp_abs and seg["speaker"] not in active_now:
+                    active_now.append(seg["speaker"])
+        else:
+            active_now = []
         n_faces = len(face_centers)
         n_active = len(active_now)
 
@@ -2696,7 +2743,17 @@ def buat_video_camera_switch(
                     )
 
             timestamp_abs = start_clip + t
-            active_speakers = get_active_speakers(diarization_data, timestamp_abs)
+            if diarization_data:
+                while diarization_idx < diarization_len and diarization_data[diarization_idx]["end"] < timestamp_abs:
+                    diarization_idx += 1
+                active_speakers = []
+                for seg in diarization_data[diarization_idx:]:
+                    if seg["start"] > timestamp_abs:
+                        break
+                    if seg["end"] >= timestamp_abs and seg["speaker"] not in active_speakers:
+                        active_speakers.append(seg["speaker"])
+            else:
+                active_speakers = []
 
             if dev_visualize:
                 # Dev visualization for camera-switch
@@ -2879,11 +2936,14 @@ def proses_klip(
     out_thm = os.path.join(cfg.outputs_dir, f"thumbnail_rank_{rank}.jpg")
 
     # Ambil resolusi video asli untuk perhitungan posisi subtitle di dev-mode
-    cap_asli = cv2.VideoCapture(cfg.file_video_asli)
-    sw = int(cap_asli.get(cv2.CAP_PROP_FRAME_WIDTH))
-    sh = int(cap_asli.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    cap_asli.release()
-    source_dim = (sw, sh)
+    source_dim = getattr(cfg, "source_video_dims", None)
+    if not source_dim:
+        cap_asli = cv2.VideoCapture(cfg.file_video_asli)
+        sw = int(cap_asli.get(cv2.CAP_PROP_FRAME_WIDTH))
+        sh = int(cap_asli.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap_asli.release()
+        source_dim = (sw, sh)
+        cfg.source_video_dims = source_dim
 
     manifest_item = {
         "rank": rank,
